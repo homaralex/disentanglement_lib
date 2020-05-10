@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from disentanglement_lib.config.sparsity_study import sweep as sparsity_study
 from disentanglement_lib.config.abstract_reasoning_study_v1.stage1 import sweep as abstract_reasoning_study_v1
 from disentanglement_lib.config.fairness_study_v1 import sweep as fairness_study_v1
 from disentanglement_lib.config.tests import sweep as tests
@@ -30,4 +31,5 @@ STUDIES = {
     "fairness_study_v1":
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
+    "sparsity": sparsity_study.SparsityStudy(),
 }
