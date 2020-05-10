@@ -3,6 +3,8 @@ from disentanglement_lib.utils import resources
 import disentanglement_lib.utils.hyperparams as h
 from six.moves import range
 
+import numpy as np
+
 
 def get_datasets():
     return h.sweep(
@@ -29,14 +31,29 @@ def get_seeds(num):
 
 
 def get_default_models():
-    # BetaVAE config.
+    # Baseline VAE
     model_name = h.fixed("model.name", "beta_vae")
     model_fn = h.fixed("model.model", "@vae()")
-    betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
-    config_beta_vae = h.zipit([model_name, betas, model_fn])
+    # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+    config_vae = h.zipit([
+        model_name,
+        # betas,
+        model_fn,
+    ])
+
+    # SparseCol config.
+    model_name = h.fixed("model.name", "col_sparse_vae")
+    model_fn = h.fixed("model.model", "@col_sparse_vae()")
+    # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+    lmbds_l1 = h.sweep("col_sparse_vae.lmbd_l1", h.discrete([
+        *np.logspace(-5, 0, 6)
+    ]))
+    config_sparse_col = h.zipit([model_name, lmbds_l1, model_fn])
 
     all_models = h.chainit([
-        config_beta_vae,
+        # TODO
+        config_vae,
+        config_sparse_col,
     ])
 
     return all_models
