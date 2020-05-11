@@ -444,7 +444,7 @@ def col_l1(weight, axis):
 
 
 @gin.configurable('dim_wise_l1_vae')
-class DImWiseL1VAE(BetaVAE):
+class DimWiseL1VAE(BetaVAE):
     def __init__(
             self,
             lmbd_l1=gin.REQUIRED,
