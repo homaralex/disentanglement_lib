@@ -32,4 +32,6 @@ STUDIES = {
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
     "sparsity": sparsity_study.SparsityStudy(),
+    "dim_wise_l1_col": sparsity_study.SparsityStudy(dim='col'),
+    "dim_wise_l1_row": sparsity_study.SparsityStudy(dim='row'),
 }
