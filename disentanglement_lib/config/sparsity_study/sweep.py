@@ -85,10 +85,7 @@ class SparsityStudy(study.Study):
 
     def get_postprocess_config_files(self):
         """Returns postprocessing config files."""
-        return list(
-            resources.get_files_in_folder(
-                # TODO
-                "config/unsupervised_study_v1/postprocess_configs/"))
+        return [resources.get_file("config/unsupervised_study_v1/postprocess_configs/mean.gin")]
 
     def get_eval_config_files(self):
         """Returns evaluation config files."""
