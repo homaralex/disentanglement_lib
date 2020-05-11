@@ -6,15 +6,7 @@ from six.moves import range
 import numpy as np
 
 
-class SparsityStudy(study.Study):
-    def __init__(
-            self,
-            dim='col',
-            with_baseline=False,
-    ):
-        self.dim = dim
-        self.with_baseline = with_baseline
-
+class BaseSparsityStudy(study.Study):
     def get_datasets(self):
         return h.sweep(
             "dataset.name",
@@ -35,41 +27,6 @@ class SparsityStudy(study.Study):
     def get_seeds(self, num):
         """Returns random seeds."""
         return h.sweep("model.random_seed", h.categorical(list(range(num))))
-
-    def get_default_models(self):
-        # Baseline VAE
-        model_name = h.fixed("model.name", "beta_vae")
-        model_fn = h.fixed("model.model", "@vae()")
-        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
-        config_vae = h.zipit([
-            model_name,
-            # betas,
-            model_fn,
-        ])
-
-        # DimWiseL1 config.
-        model_name = h.fixed("model.name", f"dim_wise_l1_{self.dim}_vae")
-        model_fn = h.fixed("model.model", "@dim_wise_l1_vae()")
-        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
-        lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
-            *np.logspace(-5, 0, 6)
-        ]))
-        dim = h.fixed('dim_wise_l1_vae.dim', self.dim)
-        all_layers = h.fixed('dim_wise_l1_vae.all_layers', True)
-        config_dim_wise_l1 = h.zipit([
-            model_name,
-            model_fn,
-            lmbds_l1,
-            dim,
-            all_layers,
-        ])
-
-        all_models = h.chainit([
-            *([config_vae] if self.with_baseline else []),
-            config_dim_wise_l1,
-        ])
-
-        return all_models
 
     def get_config(self):
         """Returns the hyperparameter configs for different experiments."""
@@ -98,3 +55,47 @@ class SparsityStudy(study.Study):
     def get_eval_config_files(self):
         """Returns evaluation config files."""
         return list(resources.get_files_in_folder("config/unsupervised_study_v1/metric_configs/"))
+
+
+class BaselineSparsityStudy(BaseSparsityStudy):
+    def get_default_models(self):
+        # Baseline VAE
+        model_name = h.fixed("model.name", "beta_vae")
+        model_fn = h.fixed("model.model", "@vae()")
+        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+        config_vae = h.zipit([
+            model_name,
+            # betas,
+            model_fn,
+        ])
+
+        all_models = h.chainit([config_vae, ])
+
+        return all_models
+
+
+class DimWiseL1SparsityStudy(BaseSparsityStudy):
+    def __init__(self, dim='col'):
+        self.dim = dim
+
+    def get_default_models(self):
+        # DimWiseL1 config.
+        model_name = h.fixed("model.name", f"dim_wise_l1_{self.dim}_vae")
+        model_fn = h.fixed("model.model", "@dim_wise_l1_vae()")
+        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+        lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
+            *np.logspace(-5, 0, 6)
+        ]))
+        dim = h.fixed('dim_wise_l1_vae.dim', self.dim)
+        all_layers = h.fixed('dim_wise_l1_vae.all_layers', True)
+        config_dim_wise_l1 = h.zipit([
+            model_name,
+            model_fn,
+            lmbds_l1,
+            dim,
+            all_layers,
+        ])
+
+        all_models = h.chainit([config_dim_wise_l1, ])
+
+        return all_models
