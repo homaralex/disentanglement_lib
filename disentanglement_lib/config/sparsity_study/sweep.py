@@ -42,13 +42,19 @@ def get_default_models():
     ])
 
     # SparseCol config.
-    model_name = h.fixed("model.name", "col_sparse_vae")
-    model_fn = h.fixed("model.model", "@col_sparse_vae()")
+    model_name = h.fixed("model.name", "dim_wise_l1_col_vae")
+    model_fn = h.fixed("model.model", "@dim_wise_l1_vae()")
     # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
-    lmbds_l1 = h.sweep("col_sparse_vae.lmbd_l1", h.discrete([
+    lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
         *np.logspace(-5, 0, 6)
     ]))
-    config_sparse_col = h.zipit([model_name, lmbds_l1, model_fn])
+    dim = h.fixed('dim_wise_l1_vae.dim', 'col')
+    config_sparse_col = h.zipit([
+        model_name,
+        model_fn,
+        lmbds_l1,
+        dim,
+    ])
 
     all_models = h.chainit([
         # TODO

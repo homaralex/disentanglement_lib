@@ -438,16 +438,28 @@ class BetaTCVAE(BaseVAE):
         return tc + kl_loss
 
 
-def col_l1(weight):
+def col_l1(weight, axis):
     weight = tf.reshape(weight, (-1, weight.shape[-1]))
-    return tf.reduce_sum(tf.abs(weight), axis=0)
+    return tf.reduce_sum(tf.abs(weight), axis=axis)
 
 
-@gin.configurable('col_sparse_vae')
-class ColSparseVAE(BetaVAE):
-    def __init__(self, lmbd_l1=gin.REQUIRED, *args, **kwargs):
+@gin.configurable('dim_wise_l1_vae')
+class DImWiseL1VAE(BetaVAE):
+    def __init__(
+            self,
+            lmbd_l1=gin.REQUIRED,
+            dim=gin.REQUIRED,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.lmbd_l1 = lmbd_l1
+        assert dim in ('col', 'row')
+        self._dim = dim
+
+    @property
+    def axis_to_penalize(self):
+        return 0 if self._dim == 'col' else 1
 
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         kld = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
@@ -457,6 +469,6 @@ class ColSparseVAE(BetaVAE):
             (any(name in w.name for name in (f'e{idx}/kernel:0' for idx in range(2, 6))) or
              'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name)
         )
-        col_l1_penalty = sum(tf.norm(col_l1(v), ord=2) for v in weights_to_penalize)
+        col_l1_penalty = sum(tf.norm(col_l1(v, axis=self.axis_to_penalize), ord=2) for v in weights_to_penalize)
 
         return kld + col_l1_penalty * self.lmbd_l1
