@@ -49,16 +49,18 @@ def get_default_models():
         *np.logspace(-5, 0, 6)
     ]))
     dim = h.fixed('dim_wise_l1_vae.dim', 'col')
+    all_layers = h.fixed('dim_wise_l1_vae.all_layers', True)
     config_sparse_col = h.zipit([
         model_name,
         model_fn,
         lmbds_l1,
         dim,
+        all_layers,
     ])
 
     all_models = h.chainit([
         # TODO
-        config_vae,
+        # config_vae,
         config_sparse_col,
     ])
 

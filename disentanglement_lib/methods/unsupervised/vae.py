@@ -449,6 +449,7 @@ class DImWiseL1VAE(BetaVAE):
             self,
             lmbd_l1=gin.REQUIRED,
             dim=gin.REQUIRED,
+            all_layers=gin.REQUIRED,
             *args,
             **kwargs,
     ):
@@ -456,6 +457,7 @@ class DImWiseL1VAE(BetaVAE):
         self.lmbd_l1 = lmbd_l1
         assert dim in ('col', 'row')
         self._dim = dim
+        self.all_layers = all_layers
 
     @property
     def axis_to_penalize(self):
@@ -466,8 +468,10 @@ class DImWiseL1VAE(BetaVAE):
 
         weights_to_penalize = list(
             w for w in tf.trainable_variables() if
-            (any(name in w.name for name in (f'e{idx}/kernel:0' for idx in range(2, 6))) or
-             'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name)
+            (
+                    (any(name in w.name for name in (f'e{idx}/kernel:0' for idx in range(2, 6))) and self.all_layers) or
+                    'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
+            )
         )
         col_l1_penalty = sum(tf.norm(col_l1(v, axis=self.axis_to_penalize), ord=2) for v in weights_to_penalize)
 
