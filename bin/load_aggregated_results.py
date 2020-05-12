@@ -37,8 +37,9 @@ def plot_results(results_file):
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_l1_', '')
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_nan', '')
 
-    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
-    for metric, ax in zip(METRICS, axes.flatten()):
+    _, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    _, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    for metric, ax_violin, ax_box in zip(METRICS, axes_violin.flatten(), axes_box.flatten()):
         print()
         if metric in ('beta_vae_sklearn', 'factor_vae_metric'):
             metric_df = df.loc[df['evaluation_config.evaluation.name'].str.contains(metric)]
@@ -49,12 +50,19 @@ def plot_results(results_file):
 
         print(metric_df.groupby(MODEL_COL_STR)[metric].mean().reset_index().sort_values(metric, ascending=False))
 
+        # TODO plot only means
         sns.violinplot(
             x=MODEL_COL_STR,
             y=metric,
             data=metric_df,
             cut=0,
-            ax=ax,
+            ax=ax_violin,
+        )
+        sns.boxplot(
+            x=MODEL_COL_STR,
+            y=metric,
+            data=metric_df,
+            ax=ax_box,
         )
 
     plt.show()
