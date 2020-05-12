@@ -1,4 +1,5 @@
 ROOT_DIR=$1
+mkdir -p ${ROOT_DIR}
 
 for FILE_ID in {0..10799}; do
   EXTRACTED_PATH=${ROOT_DIR}/${FILE_ID}
