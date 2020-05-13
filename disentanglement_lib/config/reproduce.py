@@ -24,6 +24,15 @@ from disentanglement_lib.config.fairness_study_v1 import sweep as fairness_study
 from disentanglement_lib.config.tests import sweep as tests
 from disentanglement_lib.config.unsupervised_study_v1 import sweep as unsupervised_study_v1
 
+_betas = (1, 2, 4, 6, 8, 16)
+_dim_wise_studies = {
+    **{
+        f'dim_wise_l1_col_b_{beta}': sparsity_study.DimWiseL1SparsityStudy(dim='col', beta=beta)
+        for beta in _betas
+    }, **{
+        f'dim_wise_l1_row_b_{beta}': sparsity_study.DimWiseL1SparsityStudy(dim='row', beta=beta)
+        for beta in _betas
+    }}
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -34,4 +43,5 @@ STUDIES = {
     "baseline": sparsity_study.BaselineSparsityStudy(),
     "dim_wise_l1_col": sparsity_study.DimWiseL1SparsityStudy(dim='col'),
     "dim_wise_l1_row": sparsity_study.DimWiseL1SparsityStudy(dim='row'),
+    **_dim_wise_studies,
 }

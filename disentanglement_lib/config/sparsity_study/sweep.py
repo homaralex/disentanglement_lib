@@ -34,11 +34,11 @@ class BaseSparsityStudy(study.Study):
         arch_dec = h.fixed("decoder.decoder_fn", "@deconv_decoder", length=1)
         architecture = h.zipit([arch_enc, arch_dec])
         return h.product([
+            # TODO
+            self.get_seeds(5),
             self.get_datasets(),
             architecture,
             self.get_default_models(),
-            # TODO
-            self.get_seeds(5),
         ])
 
     def get_model_config(self, model_num=0):
@@ -75,22 +75,30 @@ class BaselineSparsityStudy(BaseSparsityStudy):
 
 
 class DimWiseL1SparsityStudy(BaseSparsityStudy):
-    def __init__(self, dim='col'):
+    def __init__(
+            self,
+            beta=1,
+            dim='col',
+            all_layers=True,
+    ):
+        self.beta = beta
         self.dim = dim
+        self.all_layers = all_layers
 
     def get_default_models(self):
         # DimWiseL1 config.
         model_name = h.fixed("model.name", f"dim_wise_l1_{self.dim}_vae")
         model_fn = h.fixed("model.model", "@dim_wise_l1_vae()")
-        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+        beta = h.fixed('vae.beta', self.beta)
         lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
-            *np.logspace(-5, 0, 6)
+            *np.logspace(-5, -3, 8)
         ]))
         dim = h.fixed('dim_wise_l1_vae.dim', self.dim)
-        all_layers = h.fixed('dim_wise_l1_vae.all_layers', True)
+        all_layers = h.fixed('dim_wise_l1_vae.all_layers', self.all_layers)
         config_dim_wise_l1 = h.zipit([
             model_name,
             model_fn,
+            beta,
             lmbds_l1,
             dim,
             all_layers,
