@@ -40,7 +40,13 @@ def plot_results(results_file):
 
     _, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     _, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
-    for metric, ax_violin, ax_box in zip(METRICS, axes_violin.flatten(), axes_box.flatten()):
+    _, axes_mean = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    for metric, ax_violin, ax_box, ax_mean in zip(
+            METRICS,
+            axes_violin.flatten(),
+            axes_box.flatten(),
+            axes_mean.flatten(),
+    ):
         print()
         if metric in ('beta_vae_sklearn', 'factor_vae_metric'):
             metric_df = df.loc[df['evaluation_config.evaluation.name'].str.contains(metric)]
@@ -52,7 +58,7 @@ def plot_results(results_file):
         print(metric_df.groupby(MODEL_COL_STR)[metric].mean().reset_index().sort_values(metric, ascending=False))
 
         metric_df = metric_df.sort_values(MODEL_COL_STR)
-        # TODO plot only means
+
         sns.violinplot(
             x=MODEL_COL_STR,
             y=metric,
@@ -72,6 +78,16 @@ def plot_results(results_file):
         for tick in ax_box.get_xticklabels():
             tick.set_rotation(45)
 
+        # group and aggreagate to obtain means per model
+        metric_df = metric_df.groupby(MODEL_COL_STR)[metric].mean()
+        sns.stripplot(
+            x=metric_df.index,
+            y=metric_df,
+            ax=ax_mean,
+            size=25,
+        )
+        for tick in ax_mean.get_xticklabels():
+            tick.set_rotation(45)
 
     plt.show()
 
