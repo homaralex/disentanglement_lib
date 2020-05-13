@@ -80,16 +80,19 @@ class DimWiseL1SparsityStudy(BaseSparsityStudy):
             beta=1,
             dim='col',
             all_layers=True,
+            scale_per_layer=True,
     ):
         self.beta = beta
         self.dim = dim
         self.all_layers = all_layers
+        self.scale_per_layer = scale_per_layer
 
     def get_default_models(self):
         # DimWiseL1 config.
         model_name = h.fixed("model.name", f"dim_wise_l1_{self.dim}_vae")
         model_fn = h.fixed("model.model", "@dim_wise_l1_vae()")
         beta = h.fixed('vae.beta', self.beta)
+        scale_per_layer = h.fixed('dim_wise_l1_vae.scale_per_layer', self.scale_per_layer)
         lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
             *np.logspace(-5, -3, 8)
         ]))
@@ -99,6 +102,7 @@ class DimWiseL1SparsityStudy(BaseSparsityStudy):
             model_name,
             model_fn,
             beta,
+            scale_per_layer,
             lmbds_l1,
             dim,
             all_layers,

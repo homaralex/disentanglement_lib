@@ -438,9 +438,13 @@ class BetaTCVAE(BaseVAE):
         return tc + kl_loss
 
 
-def col_l1(weight, axis):
-    weight = tf.reshape(weight, (-1, weight.shape[-1]))
-    return tf.reduce_sum(tf.abs(weight), axis=axis)
+def col_l1(weight, axis, scale):
+    squeezed_shape = (-1, weight.shape[-1]) if axis == 0 else (weight.shape[-2], -1)
+    weight = tf.reshape(weight, squeezed_shape)
+    scale_factor = 1
+    if scale:
+        scale_factor = 1 / int(weight.shape[int(not axis)])
+    return tf.reduce_sum(tf.abs(weight), axis=axis) * scale_factor
 
 
 @gin.configurable('dim_wise_l1_vae')
@@ -450,6 +454,7 @@ class DimWiseL1VAE(BetaVAE):
             lmbd_l1=gin.REQUIRED,
             dim=gin.REQUIRED,
             all_layers=gin.REQUIRED,
+            scale_per_layer=gin.REQUIRED,
             *args,
             **kwargs,
     ):
@@ -458,6 +463,7 @@ class DimWiseL1VAE(BetaVAE):
         assert dim in ('col', 'row')
         self._dim = dim
         self.all_layers = all_layers
+        self.scale_per_layer = scale_per_layer
 
     @property
     def axis_to_penalize(self):
@@ -473,6 +479,10 @@ class DimWiseL1VAE(BetaVAE):
                     'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
             )
         )
-        col_l1_penalty = sum(tf.norm(col_l1(v, axis=self.axis_to_penalize), ord=2) for v in weights_to_penalize)
+        col_l1_penalty = sum(tf.norm(col_l1(
+            v,
+            axis=self.axis_to_penalize,
+            scale=self.scale_per_layer,
+        ), ord=2) for v in weights_to_penalize)
 
         return kld + col_l1_penalty * self.lmbd_l1
