@@ -33,9 +33,10 @@ def plot_results(results_file):
     df = pd.read_json(results_file)
 
     # TODO nicer way of mapping reg. strengths
-    df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.dim_wise_l1_vae.lmbd_l1'].map(str)
+    df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.dim_wise_l1_vae.lmbd_l1'].map("{:.2e}".format)
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_l1_', '')
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_nan', '')
+    df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
 
     _, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     _, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
@@ -50,6 +51,7 @@ def plot_results(results_file):
 
         print(metric_df.groupby(MODEL_COL_STR)[metric].mean().reset_index().sort_values(metric, ascending=False))
 
+        metric_df = metric_df.sort_values(MODEL_COL_STR)
         # TODO plot only means
         sns.violinplot(
             x=MODEL_COL_STR,
@@ -58,12 +60,18 @@ def plot_results(results_file):
             cut=0,
             ax=ax_violin,
         )
+        for tick in ax_violin.get_xticklabels():
+            tick.set_rotation(45)
+
         sns.boxplot(
             x=MODEL_COL_STR,
             y=metric,
             data=metric_df,
             ax=ax_box,
         )
+        for tick in ax_box.get_xticklabels():
+            tick.set_rotation(45)
+
 
     plt.show()
 
