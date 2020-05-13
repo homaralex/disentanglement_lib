@@ -38,9 +38,9 @@ def plot_results(results_file):
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_nan', '')
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
 
-    _, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
-    _, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
-    _, axes_mean = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    fig_violin, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    fig_box, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
+    fig_mean, axes_mean = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     for metric, ax_violin, ax_box, ax_mean in zip(
             METRICS,
             axes_violin.flatten(),
@@ -89,6 +89,9 @@ def plot_results(results_file):
         for tick in ax_mean.get_xticklabels():
             tick.set_rotation(45)
 
+    fig_violin.savefig('plots/violin.png')
+    fig_box.savefig('plots/box.png')
+    fig_mean.savefig('plots/mean.png')
     plt.show()
 
 
