@@ -80,7 +80,7 @@ class DimWiseL1SparsityStudy(BaseSparsityStudy):
             beta=1,
             dim='col',
             all_layers=True,
-            scale_per_layer=True,
+            scale_per_layer=False,
     ):
         self.beta = beta
         self.dim = dim
