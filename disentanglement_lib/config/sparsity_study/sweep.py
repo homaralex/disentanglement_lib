@@ -111,3 +111,33 @@ class DimWiseL1SparsityStudy(BaseSparsityStudy):
         all_models = h.chainit([config_dim_wise_l1, ])
 
         return all_models
+
+
+class MaskedSparsityStudy(BaseSparsityStudy):
+    def __init__(
+            self,
+            beta=1,
+            all_layers=True,
+    ):
+        self.beta = beta
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "masked_vae")
+        model_fn = h.fixed("model.model", "@vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        perc_sparse = h.sweep("conv_encoder.perc_sparse", h.discrete([
+            *np.linspace(.1, 1, 6, endpoint=False)
+        ]))
+        all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
+        config_masked = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            perc_sparse,
+            all_layers,
+        ])
+
+        all_models = h.chainit([config_masked, ])
+
+        return all_models

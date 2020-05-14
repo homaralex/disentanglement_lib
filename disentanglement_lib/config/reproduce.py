@@ -33,6 +33,16 @@ _dim_wise_studies = {
         f'dim_wise_l1_row_b_{beta}': sparsity_study.DimWiseL1SparsityStudy(dim='row', beta=beta)
         for beta in _betas
     }}
+_masked_studies = {
+    **{
+        f'masked_all_b_{beta}': sparsity_study.MaskedSparsityStudy(beta=beta)
+        for beta in _betas
+    },
+    **{
+        f'masked_b_{beta}': sparsity_study.MaskedSparsityStudy(beta=beta, all_layers=False)
+        for beta in _betas
+    }
+}
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -44,4 +54,5 @@ STUDIES = {
     "dim_wise_l1_col": sparsity_study.DimWiseL1SparsityStudy(dim='col'),
     "dim_wise_l1_row": sparsity_study.DimWiseL1SparsityStudy(dim='row'),
     **_dim_wise_studies,
+    **_masked_studies,
 }
