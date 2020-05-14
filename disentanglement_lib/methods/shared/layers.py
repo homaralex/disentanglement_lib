@@ -4,33 +4,31 @@ from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import nn
 
-# TODO add mask as parameter
+
 class MaskedConv2d(tf.layers.Conv2D):
     def __init__(self, perc_sparse=0., *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # just a placeholder for now
-        self.mask = 1
+
         self.perc_sparse = perc_sparse
 
     def _init_mask(self):
-        mask_val = (np.random.random(self.kernel.shape[-2:]) >= self.perc_sparse).astype('float')
-        self.mask = tf.constant(
-            value=mask_val,
+        mask_shape = self.kernel.shape[-2:]
+        mask_val = (np.random.random(mask_shape) >= self.perc_sparse).astype('float')
+        self.mask = self.add_weight(
             name='mask',
-            dtype=self.kernel.dtype,
+            shape=mask_shape,
+            initializer=init_ops.Constant(mask_val),
+            trainable=False,
+            dtype=self.dtype,
         )
-        print('init_mask')
 
-    # def apply(self, inputs, *args, **kwargs):
-    #     ret = super().apply(inputs, *args, **kwargs)
-    #
-    #
-    #
-    #     return ret
+    def build(self, input_shape):
+        super().build(input_shape)
+        self.built = False
+        self._init_mask()
+        self.built = True
 
     def call(self, inputs):
-        print('call')
-        self._init_mask()
         outputs = self._convolution_op(inputs, self.kernel * self.mask)
 
         if self.use_bias:
