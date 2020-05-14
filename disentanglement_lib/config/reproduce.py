@@ -23,26 +23,34 @@ from disentanglement_lib.config.abstract_reasoning_study_v1.stage1 import sweep 
 from disentanglement_lib.config.fairness_study_v1 import sweep as fairness_study_v1
 from disentanglement_lib.config.tests import sweep as tests
 from disentanglement_lib.config.unsupervised_study_v1 import sweep as unsupervised_study_v1
+import disentanglement_lib.utils.hyperparams as h
 
-_betas = (1, 2, 4, 6, 8, 16)
+_betas = h.sweep('beta', (1, 2, 4, 6, 8, 16))
+_datasets = h.sweep('dataset', (
+    "dsprites_full",
+    "color_dsprites",
+    "noisy_dsprites",
+    "scream_dsprites",
+    "smallnorb",
+    "cars3d",
+    "shapes3d",
+))
+_all_layers = h.sweep('all_layers', (True, False))
+_scale_per_layer = h.sweep('scale_per_layer', (True, False))
+_dims = h.sweep('dim', ('col', 'row'))
+_sweep_dim_wise = h.product((_betas, _datasets, _all_layers, _scale_per_layer, _dims))
 _dim_wise_studies = {
-    **{
-        f'dim_wise_l1_col_b_{beta}': sparsity_study.DimWiseL1SparsityStudy(dim='col', beta=beta)
-        for beta in _betas
-    }, **{
-        f'dim_wise_l1_row_b_{beta}': sparsity_study.DimWiseL1SparsityStudy(dim='row', beta=beta)
-        for beta in _betas
-    }}
-_masked_studies = {
-    **{
-        f'masked_all_b_{beta}': sparsity_study.MaskedSparsityStudy(beta=beta)
-        for beta in _betas
-    },
-    **{
-        f'masked_b_{beta}': sparsity_study.MaskedSparsityStudy(beta=beta, all_layers=False)
-        for beta in _betas
-    }
+    f"{s['dataset']}_dim_wise_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseL1SparsityStudy(
+        **s)
+    for s in _sweep_dim_wise
 }
+
+_sweep_dim_wise = h.product((_betas, _datasets, _all_layers))
+_masked_studies = {
+    f"{s['dataset']}_masked_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.MaskedSparsityStudy(**s)
+    for s in _sweep_dim_wise
+}
+
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -50,9 +58,7 @@ STUDIES = {
     "fairness_study_v1":
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
-    "baseline": sparsity_study.BaselineSparsityStudy(),
-    "dim_wise_l1_col": sparsity_study.DimWiseL1SparsityStudy(dim='col'),
-    "dim_wise_l1_row": sparsity_study.DimWiseL1SparsityStudy(dim='row'),
+
     **_dim_wise_studies,
     **_masked_studies,
 }

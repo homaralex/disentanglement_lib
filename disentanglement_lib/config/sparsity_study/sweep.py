@@ -7,6 +7,10 @@ import numpy as np
 
 
 class BaseSparsityStudy(study.Study):
+    def __init__(self, beta, dataset):
+        self.beta = beta
+        self.dataset = dataset
+
     def get_datasets(self):
         return h.sweep(
             "dataset.name",
@@ -77,12 +81,13 @@ class BaselineSparsityStudy(BaseSparsityStudy):
 class DimWiseL1SparsityStudy(BaseSparsityStudy):
     def __init__(
             self,
-            beta=1,
             dim='col',
             all_layers=True,
             scale_per_layer=False,
+            *args,
+            **kwargs
     ):
-        self.beta = beta
+        super().__init__(*args, **kwargs)
         self.dim = dim
         self.all_layers = all_layers
         self.scale_per_layer = scale_per_layer
@@ -114,12 +119,8 @@ class DimWiseL1SparsityStudy(BaseSparsityStudy):
 
 
 class MaskedSparsityStudy(BaseSparsityStudy):
-    def __init__(
-            self,
-            beta=1,
-            all_layers=True,
-    ):
-        self.beta = beta
+    def __init__(self, all_layers=True, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.all_layers = all_layers
 
     def get_default_models(self):
