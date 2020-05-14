@@ -1,22 +1,26 @@
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.layers.core import Dense
 from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import nn
 
 
-class MaskedConv2d(tf.layers.Conv2D):
+class _BaseMaskedLayer:
     def __init__(self, perc_sparse=0., *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.perc_sparse = perc_sparse
 
+    @property
+    def mask_shape(self):
+        raise NotImplementedError()
+
     def _init_mask(self):
-        mask_shape = self.kernel.shape[-2:]
-        mask_val = (np.random.random(mask_shape) >= self.perc_sparse).astype('float')
+        mask_val = (np.random.random(self.mask_shape) >= self.perc_sparse).astype('float')
         self.mask = self.add_weight(
             name='mask',
-            shape=mask_shape,
+            shape=self.mask_shape,
             initializer=init_ops.Constant(mask_val),
             trainable=False,
             dtype=self.dtype,
@@ -27,6 +31,12 @@ class MaskedConv2d(tf.layers.Conv2D):
         self.built = False
         self._init_mask()
         self.built = True
+
+
+class MaskedConv2d(_BaseMaskedLayer, tf.layers.Conv2D):
+    @property
+    def mask_shape(self):
+        return self.kernel.shape[-2:]
 
     def call(self, inputs):
         outputs = self._convolution_op(inputs, self.kernel * self.mask)
@@ -92,3 +102,7 @@ def masked_conv2d(
         perc_sparse=perc_sparse,
     )
     return layer.apply(inputs)
+
+
+class MaskedDense(Dense):
+    pass
