@@ -5,6 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 MODEL_COL_STR = 'train_config.model.name'
+DLIB_RESULTS_PATH = 'aggregated_results/dlib_beta_vae_results.json'
 
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
@@ -30,6 +31,9 @@ METRICS = (
 
 
 def plot_results(results_file):
+    dlib_df = pd.read_json(DLIB_RESULTS_PATH)
+    dlib_df = dlib_df.loc[dlib_df['train_config.vae.beta'] == 1]
+
     df = pd.read_json(results_file)
 
     # TODO nicer way of mapping reg. strengths
@@ -37,6 +41,9 @@ def plot_results(results_file):
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_l1_', '')
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_nan', '')
     df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
+    df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-5, 1e-3)]
+
+    df = pd.concat((df, dlib_df))
 
     fig_violin, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     fig_box, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
@@ -50,7 +57,6 @@ def plot_results(results_file):
         print()
         if metric in ('beta_vae_sklearn', 'factor_vae_metric'):
             metric_df = df.loc[df['evaluation_config.evaluation.name'].str.contains(metric)]
-            # print(metric_df[['train_config.model.name', 'evaluation_results.eval_accuracy']])
             metric = 'evaluation_results.eval_accuracy'
         else:
             metric_df = df.loc[df[metric].notna()]
@@ -100,4 +106,4 @@ if __name__ == '__main__':
     parser.add_argument('results_file', type=str)
     args = parser.parse_args()
 
-    results_df = plot_results(args.results_file)
+    plot_results(args.results_file)
