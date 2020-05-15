@@ -142,3 +142,39 @@ class MaskedSparsityStudy(BaseSparsityStudy):
         all_models = h.chainit([config_masked, ])
 
         return all_models
+
+
+class DimWiseMaskL1Study(DimWiseL1SparsityStudy):
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "dim_wise_mask_l1_vae")
+        model_fn = h.fixed("model.model", "@dim_wise_mask_l1_vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        scale_per_layer = h.fixed('dim_wise_l1_vae.scale_per_layer', self.scale_per_layer)
+        dim = h.fixed('dim_wise_l1_vae.dim', self.dim)
+        all_layers_1 = h.fixed('dim_wise_l1_vae.all_layers', self.all_layers)
+        all_layers_2 = h.fixed('conv_encoder.all_layers', self.all_layers)
+        # make the masks full (no zero-entries)
+        perc_sparse = h.fixed("conv_encoder.perc_sparse", h.discrete(0))
+        # but allow to modify the entries
+        mask_trainable = h.fixed('masked_layer.mask_trainable', True)
+        lmbds_l2 = h.fixed('dim_wise_mask_l1_vae.lmbd_l2', h.discrete(.01))
+        lmbds_l1 = h.sweep("dim_wise_l1_vae.lmbd_l1", h.discrete([
+            *np.logspace(-5, -3, 8)
+        ]))
+        config_masked_l1 = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            scale_per_layer,
+            dim,
+            all_layers_1,
+            all_layers_2,
+            perc_sparse,
+            mask_trainable,
+            lmbds_l2,
+            lmbds_l1,
+        ])
+
+        all_models = h.chainit([config_masked_l1, ])
+
+        return all_models

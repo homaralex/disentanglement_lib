@@ -45,6 +45,12 @@ _dim_wise_studies = {
     for s in _sweep_dim_wise
 }
 
+_dim_wise_mask_studies = {
+    f"{s['dataset']}_dim_wise_mask_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseMaskL1Study(
+        **s)
+    for s in _sweep_dim_wise
+}
+
 _sweep_dim_wise = h.product((_betas, _datasets, _all_layers))
 _masked_studies = {
     f"{s['dataset']}_masked_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.MaskedSparsityStudy(**s)
@@ -58,7 +64,7 @@ STUDIES = {
     "fairness_study_v1":
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
-
     **_dim_wise_studies,
+    **_dim_wise_mask_studies,
     **_masked_studies,
 }

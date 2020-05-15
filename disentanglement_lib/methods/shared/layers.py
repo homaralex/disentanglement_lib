@@ -1,3 +1,4 @@
+import gin
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.layers.core import Dense
@@ -12,11 +13,13 @@ from tensorflow.python.ops import nn
 from tensorflow.python.ops import standard_ops
 
 
+@gin.configurable('masked_layer', whitelist=['mask_trainable'])
 class _BaseMaskedLayer:
-    def __init__(self, perc_sparse=0, *args, **kwargs):
+    def __init__(self, perc_sparse=0, mask_trainable=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.perc_sparse = perc_sparse
+        self.mask_trainable = mask_trainable
 
     @property
     def mask_shape(self):
@@ -28,7 +31,7 @@ class _BaseMaskedLayer:
             name='mask',
             shape=self.mask_shape,
             initializer=init_ops.Constant(mask_val),
-            trainable=False,
+            trainable=self.mask_trainable,
             dtype=self.dtype,
         )
 

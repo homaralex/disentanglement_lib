@@ -469,20 +469,38 @@ class DimWiseL1VAE(BetaVAE):
     def axis_to_penalize(self):
         return 0 if self._dim == 'col' else 1
 
+    def get_weights_to_penalize(self):
+        return (w for w in tf.trainable_variables() if
+                (
+                        (any(name in w.name for name in
+                             (f'e{idx}/kernel:0' for idx in range(2, 6))) and self.all_layers) or
+                        'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
+                ))
+
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         kld = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
 
-        weights_to_penalize = list(
-            w for w in tf.trainable_variables() if
-            (
-                    (any(name in w.name for name in (f'e{idx}/kernel:0' for idx in range(2, 6))) and self.all_layers) or
-                    'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
-            )
-        )
         col_l1_penalty = sum(tf.norm(col_l1(
             v,
             axis=self.axis_to_penalize,
             scale=self.scale_per_layer,
-        ), ord=2) for v in weights_to_penalize)
+        ), ord=2) for v in self.get_weights_to_penalize())
 
         return kld + col_l1_penalty * self.lmbd_l1
+
+
+@gin.configurable('dim_wise_mask_l1_vae')
+class DimWiseMaskL1VAE(DimWiseL1VAE):
+    def __init__(self, lmbd_l2, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lmbd_l2 = lmbd_l2
+
+    def get_weights_to_penalize(self):
+        return (w for w in tf.trainable_variables() if 'mask' in w.name)
+
+    def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
+        reg_loss = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
+
+        l2_penalty = sum(tf.norm(w, ord=2) for w in super().get_weights_to_penalize())
+
+        return reg_loss + l2_penalty * self.lmbd_l2

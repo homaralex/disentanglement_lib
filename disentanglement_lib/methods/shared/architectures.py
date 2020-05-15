@@ -144,7 +144,7 @@ def fc_encoder(input_tensor, num_latent, is_training=True):
 
 
 @gin.configurable("conv_encoder", whitelist=['perc_sparse', 'all_layers'])
-def conv_encoder(input_tensor, num_latent, perc_sparse=0, all_layers=True, is_training=True):
+def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is_training=True):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
 
     Based on row 3 of Table 1 on page 13 of "beta-VAE: Learning Basic Visual
@@ -165,7 +165,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=0, all_layers=True, is_tr
     """
     del is_training
 
-    use_masked = perc_sparse > 0
+    use_masked = perc_sparse is not None
 
     def conv2d(*args, **kwargs):
         if use_masked and all_layers:
