@@ -64,6 +64,7 @@ STUDIES = {
     "fairness_study_v1":
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
+    'wae': sparsity_study.WAEStudy(dataset='dsprites_full'),
     **_dim_wise_studies,
     **_dim_wise_mask_studies,
     **_masked_studies,

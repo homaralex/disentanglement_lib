@@ -178,3 +178,27 @@ class DimWiseMaskL1Study(DimWiseL1SparsityStudy):
         all_models = h.chainit([config_masked_l1, ])
 
         return all_models
+
+
+class WAEStudy(BaseSparsityStudy):
+    def __init__(self, *args, **kwargs):
+        # add a placeholder for beta
+        super().__init__(beta=1, *args, **kwargs)
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "wae")
+        model_fn = h.fixed("model.model", "@wae()")
+        scale = h.fixed("wae.scale", 1 / 8)
+        adaptive = h.fixed("wae.adaptive", True)
+        betas = h.sweep("vae.beta", h.discrete([*np.logspace(-4, -2, 3)]))
+        config_vae = h.zipit([
+            model_name,
+            model_fn,
+            scale,
+            adaptive,
+            betas,
+        ])
+
+        all_models = h.chainit([config_vae, ])
+
+        return all_models

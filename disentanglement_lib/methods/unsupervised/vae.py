@@ -504,3 +504,39 @@ class DimWiseMaskL1VAE(DimWiseL1VAE):
         l2_penalty = sum(tf.norm(w, ord=2) for w in super().get_weights_to_penalize())
 
         return reg_loss + l2_penalty * self.lmbd_l2
+
+
+@gin.configurable('wae')
+class WAE(BetaVAE):
+    def __init__(self, scale, adaptive, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scale = scale
+        self.adaptive = adaptive
+
+    def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
+        del kl_loss
+
+        z = z_sampled
+        nf = tf.cast(tf.shape(z)[0], "float32")
+        latent_dim = tf.cast(tf.shape(z)[1], "float32")
+
+        norms2 = tf.reduce_sum(tf.square(z), axis=1, keepdims=True)
+        dotprods = tf.matmul(z, z, transpose_b=True)
+        dists2 = norms2 + tf.transpose(norms2) - 2. * dotprods
+
+        if self.adaptive:
+            mean_norms2 = tf.reduce_mean(norms2)
+            gamma2 = tf.stop_gradient(self.scale * mean_norms2)
+        else:
+            gamma2 = self.scale * latent_dim
+
+        variance = (gamma2 / (2. + gamma2)) ** latent_dim + (gamma2 / (4. + gamma2)) ** (latent_dim / 2.) - 2. * (
+                gamma2 ** 2. / ((1. + gamma2) * (3. + gamma2))) ** (latent_dim / 2.)
+        variance = 2. * variance / (nf * (nf - 1.))
+        variance_normalization = variance ** (-1. / 2.)
+
+        Ekzz = (tf.reduce_sum(tf.exp(-dists2 / (2. * gamma2))) - nf) / (nf * nf - nf)
+        Ekzn = (gamma2 / (1. + gamma2)) ** (latent_dim / 2.) * tf.reduce_mean(tf.exp(-norms2 / (2. * (1. + gamma2))))
+        Eknn = (gamma2 / (2. + gamma2)) ** (latent_dim / 2.)
+
+        return variance_normalization * (Ekzz - 2. * Ekzn + Eknn) * self.beta
