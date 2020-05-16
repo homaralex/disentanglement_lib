@@ -12,18 +12,7 @@ class BaseSparsityStudy(study.Study):
         self.dataset = dataset
 
     def get_datasets(self):
-        return h.sweep(
-            "dataset.name",
-            h.categorical([
-                # TODO
-                "dsprites_full",
-                # "color_dsprites",
-                # "noisy_dsprites",
-                # "scream_dsprites",
-                # "smallnorb",
-                # "cars3d",
-                # "shapes3d",
-            ]))
+        return h.fixed('dataset.name', self.dataset)
 
     def get_num_latent(self, sweep):
         return h.sweep("encoder.num_latent", h.discrete(sweep))
