@@ -102,13 +102,13 @@ def train(model_dir,
   # We create a TPUEstimator based on the provided model. This is primarily so
   # that we could switch to TPU training in the future. For now, we train
   # locally on GPUs.
-  # config = tf.ConfigProto()
-  # config.gpu_options.allow_growth = True
+  config = tf.ConfigProto()
+  config.gpu_options.allow_growth = True
   run_config = tf.contrib.tpu.RunConfig(
       tf_random_seed=random_seed,
       keep_checkpoint_max=1,
       tpu_config=tf.contrib.tpu.TPUConfig(iterations_per_loop=500),
-      # session_config=config,
+      session_config=config,
   )
   tpu_estimator = tf.contrib.tpu.TPUEstimator(
       use_tpu=False,

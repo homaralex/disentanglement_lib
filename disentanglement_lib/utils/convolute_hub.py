@@ -69,7 +69,9 @@ def convolute_and_save(module_path, signature, export_path, transform_fn,
       init_fn = tf.contrib.framework.assign_from_checkpoint_fn(
           transform_checkpoint_path, transform_variables)
 
-    with tf.Session() as sess:
+    sess_config = tf.ConfigProto()
+    sess_config.gpu_options.allow_growth = True
+    with tf.Session(config=sess_config) as sess:
       # Initialize all variables, this also loads the TFHub parameters.
       sess.run(tf.global_variables_initializer())
       # Load the transformer variables from the checkpoint.
@@ -104,7 +106,10 @@ def save_numpy_arrays_to_checkpoint(checkpoint_path, **dict_with_arrays):
       # We use the placeholder to assign the variable the intended value.
       assign_ops.append(tf.assign(node, placeholder))
     saver = tf.train.Saver(nodes_to_save)
-    with tf.Session() as sess:
+
+    sess_config = tf.ConfigProto()
+    sess_config.gpu_options.allow_growth = True
+    with tf.Session(config=sess_config) as sess:
       sess.run(tf.global_variables_initializer())
       sess.run(assign_ops, feed_dict=feed_dict)
       saver.save(sess, checkpoint_path)
