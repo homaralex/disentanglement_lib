@@ -90,6 +90,10 @@ def main(unused_argv):
         # Insert model number and study name into path if necessary.
         output_directory = output_directory.format(model_num=str(model_num),
                                                    study=str(FLAGS.study))
+        if os.path.exists(output_directory):
+            logging.info("Directory already exists and overwrite is False - continuing.")
+            logging.info(output_directory)
+            continue
 
         # Model training (if model directory is not provided).
         if FLAGS.model_dir is None:
