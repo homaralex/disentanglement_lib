@@ -122,8 +122,19 @@ def evaluate(model_dir,
 
     def _representation_function(x):
       """Computes representation vector for input images."""
-      output = f(dict(images=x), signature="representation", as_dict=True)
-      return np.array(output["default"])
+
+      # TODO make this configurabe
+      batch_size = 64
+      num_outputs = 0
+      output = []
+      while num_outputs < x.shape[0]:
+          inputs = x[num_outputs:min(num_outputs + batch_size, x.shape[0])]
+          output_batch = f(dict(images=inputs), signature="representation", as_dict=True)
+          output_batch = np.array(output_batch["default"])
+          num_outputs += output_batch.shape[0]
+          output.append(output_batch)
+
+      return np.concatenate(output)
 
     # Computes scores of the representation based on the evaluation_fn.
     if _has_kwarg_or_kwargs(evaluation_fn, "artifact_dir"):
