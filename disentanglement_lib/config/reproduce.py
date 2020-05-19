@@ -39,6 +39,7 @@ _all_layers = h.sweep('all_layers', (True, False))
 _scale_per_layer = h.sweep('scale_per_layer', (True, False))
 _dims = h.sweep('dim', ('col', 'row'))
 _sweep_dim_wise = h.product((_betas, _datasets, _all_layers, _scale_per_layer, _dims))
+
 _dim_wise_studies = {
     f"{s['dataset']}_dim_wise_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseL1SparsityStudy(
         **s)
@@ -50,11 +51,17 @@ _dim_wise_mask_studies = {
         **s)
     for s in _sweep_dim_wise
 }
+_weight_decay_studies = {
+    f"{s['dataset']}_weight_decay_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.WeigthDecaystudy(
+        lmbd_l2_range=(.01,),
+        **s)
+    for s in _sweep_dim_wise
+}
 
-_sweep_dim_wise = h.product((_betas, _datasets, _all_layers))
+_sweep_masked = h.product((_betas, _datasets, _all_layers))
 _masked_studies = {
     f"{s['dataset']}_masked_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.MaskedSparsityStudy(**s)
-    for s in _sweep_dim_wise
+    for s in _sweep_masked
 }
 
 STUDIES = {
@@ -67,5 +74,6 @@ STUDIES = {
     'wae': sparsity_study.WAEStudy(dataset='dsprites_full'),
     **_dim_wise_studies,
     **_dim_wise_mask_studies,
+    **_weight_decay_studies,
     **_masked_studies,
 }
