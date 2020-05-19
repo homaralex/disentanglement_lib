@@ -212,6 +212,13 @@ class WeigthDecaystudy(DimWiseMaskL1Study):
         return all_models
 
 
+class MaskL1Study(DimWiseMaskL1Study):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.dim = None
+
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, *args, **kwargs):
         # add a placeholder for beta

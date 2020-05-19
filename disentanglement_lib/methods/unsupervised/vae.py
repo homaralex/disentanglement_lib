@@ -460,14 +460,19 @@ class DimWiseL1VAE(BetaVAE):
     ):
         super().__init__(*args, **kwargs)
         self.lmbd_l1 = lmbd_l1
-        assert dim in ('col', 'row')
+        assert dim in ('col', 'row', None)
         self._dim = dim
         self.all_layers = all_layers
         self.scale_per_layer = scale_per_layer
 
     @property
     def axis_to_penalize(self):
-        return 0 if self._dim == 'col' else 1
+        if self._dim == 'col':
+            return 0
+        elif self._dim == 'row':
+            return 1
+        else:
+            return None
 
     def get_weights_to_penalize(self):
         return (w for w in tf.trainable_variables() if
