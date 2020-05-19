@@ -25,7 +25,7 @@ from disentanglement_lib.config.tests import sweep as tests
 from disentanglement_lib.config.unsupervised_study_v1 import sweep as unsupervised_study_v1
 import disentanglement_lib.utils.hyperparams as h
 
-_betas = h.sweep('beta', (1, 2, 4, 6, 8, 16, 32))
+_betas = h.sweep('beta', (1, 2, 4, 6, 8, 16, 32, 64))
 _datasets = h.sweep('dataset', (
     "dsprites_full",
     "color_dsprites",
