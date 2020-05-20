@@ -15,21 +15,18 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
 METRICS = (
-    'evaluation_results.informativeness_test',
-    'evaluation_results.disentanglement',
-    'evaluation_results.completeness',
-    'evaluation_results.discrete_mig',
-    # 'evaluation_results.eval_accuracy',
     'beta_vae_sklearn',
     'factor_vae_metric',
+    'evaluation_results.discrete_mig',
     'evaluation_results.modularity_score',
-    'evaluation_results.explicitness_score_test',
-    # 'evaluation_results.num_active_dims',
     'evaluation_results.SAP_score',
-    'evaluation_results.gaussian_total_correlation',
-    # 'evaluation_results.gaussian_wasserstein_correlation',
-    'evaluation_results.gaussian_wasserstein_correlation_norm',
+    'evaluation_results.disentanglement',
+    'evaluation_results.completeness',
+    'evaluation_results.informativeness_test',
+    'evaluation_results.explicitness_score_test',
     'evaluation_results.mutual_info_score',
+    'evaluation_results.gaussian_total_correlation',
+    'evaluation_results.gaussian_wasserstein_correlation_norm',
 )
 
 PLOT_DIR = Path('plots')
@@ -56,7 +53,6 @@ def plot_results(results_file):
         out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
         if scale and 'masked' in method:
             continue
-        out_dir.mkdir(exist_ok=True, parents=True)
 
         df = pd.read_json(results_file)
         if 'dim_wise_mask_l1' in method:
@@ -67,6 +63,7 @@ def plot_results(results_file):
                 axis=1,
             )
             df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')] = dim_wise_df
+
         df = df.loc[df[MODEL_COL_STR].str.contains(method)]
         idxs_all_layers = (df['train_config.dim_wise_l1_vae.all_layers'] == 'True') | (
                 df['train_config.conv_encoder.all_layers'] == 'True')
@@ -74,7 +71,7 @@ def plot_results(results_file):
         idxs_scale = (df['train_config.dim_wise_l1_vae.scale_per_layer'] == 'True')
         df = df.loc[idxs_scale] if scale else df.loc[~idxs_scale]
 
-        print(out_dir)
+        print(dataset, out_dir.parts[1:])
         print(len(df))
         if len(df) < 1:
             continue
@@ -83,18 +80,29 @@ def plot_results(results_file):
             # TODO nicer way of mapping reg. strengths
             df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.dim_wise_l1_vae.lmbd_l1'].map(
                 "{:.2e}".format)
-            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_l1_', '')
+            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_mask_l1_', '')
             df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
             df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-5, 1e-3)]
+            reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l1'
         elif method == 'masked':
             df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.conv_encoder.perc_sparse'].map(
                 lambda x: round(float(x), 2)
             ).map(str)
+            reg_weight_col = 'train_config.conv_encoder.perc_sparse'
+            df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
 
         dlib_df = pd.read_json(DLIB_RESULTS_PATH)
+        dlib_df[reg_weight_col] = 0
         df = pd.concat((df, dlib_df))
         df = df.loc[
-            (df['train_config.vae.beta'] == beta) & (df['train_config.dataset.name'] == f"'{dataset}'")]
+            (df['train_config.vae.beta'] == beta)
+            & (df['train_config.dataset.name'] == f"'{dataset}'")
+            ]
+        if len(df[MODEL_COL_STR].unique()) < 2:
+            continue
+        df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace("'", '')
+
+        out_dir.mkdir(exist_ok=True, parents=True)
 
         fig_violin, axes_violin = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
         fig_box, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
@@ -112,11 +120,9 @@ def plot_results(results_file):
             else:
                 metric_df = df.loc[df[metric].notna()]
 
-            print(
-                metric_df.groupby(MODEL_COL_STR)[metric].mean().reset_index().sort_values(metric,
-                                                                                          ascending=False))
+            print(metric_df.groupby(MODEL_COL_STR)[metric].mean().reset_index().sort_values(metric, ascending=False))
 
-            metric_df = metric_df.sort_values(MODEL_COL_STR)
+            metric_df = metric_df.sort_values(reg_weight_col)
 
             sns.violinplot(
                 x=MODEL_COL_STR,
@@ -138,13 +144,15 @@ def plot_results(results_file):
                 tick.set_rotation(45)
 
             # group and aggreagate to obtain means per model
-            metric_df = metric_df.groupby(MODEL_COL_STR)[metric].mean()
+            metric_df = metric_df.groupby(reg_weight_col)[metric].mean()
             sns.stripplot(
-                x=metric_df.index,
-                y=metric_df,
+                x=metric_df.index.values.round(5),
+                y=metric_df.values,
                 ax=ax_mean,
                 size=25,
             )
+            ax_mean.set_ylabel(metric)
+
             for tick in ax_mean.get_xticklabels():
                 tick.set_rotation(45)
 
