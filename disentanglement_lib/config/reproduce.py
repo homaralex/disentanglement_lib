@@ -64,6 +64,18 @@ _dim_wise_mask_studies_3 = {
         **s)
     for s in _sweep_dim_wise
 }
+_dim_wise_mask_studies_4 = {
+    f"{s['dataset']}_dim_wise_mask_3_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseMaskL1Study(
+        lmbd_l1_range=np.logspace(0, -2, 4, endpoint=False),
+        **s)
+    for s in _sweep_dim_wise
+}
+_dim_wise_mask_studies_5 = {
+    f"{s['dataset']}_dim_wise_mask_3_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseMaskL1Study(
+        lmbd_l1_range=np.logspace(-9, -7, 4, endpoint=False),
+        **s)
+    for s in _sweep_dim_wise
+}
 _mask_l1_studies = {
     f"{s['dataset']}_mask_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
         lmbd_l1_range=np.logspace(-8, -3, 6),
@@ -73,6 +85,18 @@ _mask_l1_studies = {
 _mask_l1_studies_2 = {
     f"{s['dataset']}_mask_2_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
         lmbd_l1_range=np.logspace(-4, -2, 5),
+        **s)
+    for s in _sweep_dim_wise
+}
+_mask_l1_studies_3 = {
+    f"{s['dataset']}_mask_2_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
+        lmbd_l1_range=np.logspace(0, -2, 4, endpoint=False),
+        **s)
+    for s in _sweep_dim_wise
+}
+_mask_l1_studies_4 = {
+    f"{s['dataset']}_mask_2_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
+        lmbd_l1_range=np.logspace(-10, -8, 4, endpoint=False),
         **s)
     for s in _sweep_dim_wise
 }
@@ -101,8 +125,12 @@ STUDIES = {
     **_dim_wise_mask_studies,
     **_dim_wise_mask_studies_2,
     **_dim_wise_mask_studies_3,
+    **_dim_wise_mask_studies_4,
+    **_dim_wise_mask_studies_5,
     **_mask_l1_studies,
     **_mask_l1_studies_2,
+    **_mask_l1_studies_3,
+    **_mask_l1_studies_4,
     **_weight_decay_studies,
     **_masked_studies,
 }
