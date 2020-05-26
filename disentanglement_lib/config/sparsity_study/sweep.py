@@ -28,7 +28,7 @@ class BaseSparsityStudy(study.Study):
         architecture = h.zipit([arch_enc, arch_dec])
         return h.product([
             # TODO
-            self.get_seeds(5),
+            self.get_seeds(10),
             self.get_datasets(),
             architecture,
             self.get_default_models(),
