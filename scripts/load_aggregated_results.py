@@ -1,5 +1,4 @@
 import argparse
-import itertools
 from collections import defaultdict
 from pathlib import Path
 
@@ -56,12 +55,17 @@ def main(result_files):
             16,
             # 32,
         )),
-        h.sweep('all_layers', (True, False)),
-        h.sweep('scale', (True, False)),
+        h.sweep('all_layers', (
+            True,
+            False,
+        )),
+        h.sweep('scale', (
+            True,
+            False,
+        )),
     ))
-    partial_dfs = defaultdict(list)
 
-    model_idx = 0
+    df_list = []
     for setting in sweep:
         dataset, method, beta, all_layers, scale = setting['dataset'], setting['method'], setting['beta'], setting[
             'all_layers'], setting['scale']
@@ -134,22 +138,49 @@ def main(result_files):
         #     reg_weight_col=reg_weight_col,
         # )
 
-        # df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
-        df['model_idx'] = model_idx
-        model_idx += 1
-        partial_dfs[dataset].append(df.loc[df[reg_weight_col] != 0])
+        df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
+        df_list.append(df.loc[df[reg_weight_col] != 0])
 
-    for dataset in DATASETS:
-        print(dataset)
-        df = pd.concat(partial_dfs[dataset], sort=True)
+    df = pd.concat(df_list)
+    df = pd.concat((df, dlib_df))
+    df = df.loc[df['train_config.vae.beta'] == 16]
 
-        for metric in METRICS:
-            metric_df, metric = get_metric_df(df, metric)
+    names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
+    df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
+    for name, idx in names_idx_dict.items():
+        print(idx, name)
+
+    ranking_dict = {dataset: defaultdict(list) for dataset in (DATASETS + ('all',))}
+    for col_name in (
+            MODEL_COL_STR,
+            # 'model_idx',
+    ):
+        for dataset in DATASETS:
             print()
-            print(metric_df.groupby('model_idx')[metric].mean().reset_index().sort_values(metric, ascending=False)[:5])
+            print(dataset)
+            dset_df = df.loc[df['train_config.dataset.name'] == f"'{dataset}'"]
 
-    df = pd.concat(itertools.chain(df for df in partial_dfs.values()))
-    print(df.groupby('model_idx')[MODEL_COL_STR])
+            for metric in METRICS:
+                metric_df, metric = get_metric_df(dset_df, metric)
+                print()
+                ranking = metric_df.groupby(col_name)[metric].mean().reset_index().sort_values(metric, ascending=False)
+                print(ranking[:5])
+
+                for idx, row in enumerate(ranking.values):
+                    model_name = row[0]
+                    ranking_dict[dataset][model_name].append(idx)
+                    ranking_dict['all'][model_name].append(idx)
+
+    with (RESULTS_DIR / 'rankings.csv').open(mode='w') as out_file:
+        for dataset in (DATASETS + ('all',)):
+            out_file.writelines([f'{dataset}\n'])
+            print(f'\nRanking for {dataset}:\n')
+
+            dset_ranking_dict = {name: sum(scores) / len(scores) for name, scores in ranking_dict[dataset].items()}
+            ranked = tuple((name, score) for name, score in sorted(dset_ranking_dict.items(), key=lambda item: item[1]))
+            for name, score in ranked:
+                out_file.writelines([f'{score:.3f},  {name}\n'])
+                print(f'{score:.3f}: {name}')
 
 
 def get_metric_df(df, metric):
