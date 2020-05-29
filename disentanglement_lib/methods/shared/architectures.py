@@ -143,8 +143,15 @@ def fc_encoder(input_tensor, num_latent, is_training=True):
     return means, log_var
 
 
-@gin.configurable("conv_encoder", whitelist=['perc_sparse', 'all_layers'])
-def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is_training=True):
+@gin.configurable("conv_encoder", whitelist=['perc_sparse', 'all_layers', 'perc_units'])
+def conv_encoder(
+        input_tensor,
+        num_latent,
+        perc_sparse=None,
+        all_layers=True,
+        perc_units=1.,
+        is_training=True,
+):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
 
     Based on row 3 of Table 1 on page 13 of "beta-VAE: Learning Basic Visual
@@ -188,7 +195,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is
     # never mask the first layer
     e1 = tf.layers.conv2d(
         inputs=input_tensor,
-        filters=32,
+        filters=int(32 * perc_units),
         kernel_size=4,
         strides=2,
         activation=tf.nn.relu,
@@ -197,7 +204,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is
     )
     e2 = conv2d(
         inputs=e1,
-        filters=32,
+        filters=int(32 * perc_units),
         kernel_size=4,
         strides=2,
         activation=tf.nn.relu,
@@ -206,7 +213,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is
     )
     e3 = conv2d(
         inputs=e2,
-        filters=64,
+        filters=int(64 * perc_units),
         kernel_size=2,
         strides=2,
         activation=tf.nn.relu,
@@ -215,7 +222,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is
     )
     e4 = conv2d(
         inputs=e3,
-        filters=64,
+        filters=int(64 * perc_units),
         kernel_size=2,
         strides=2,
         activation=tf.nn.relu,
@@ -223,7 +230,7 @@ def conv_encoder(input_tensor, num_latent, perc_sparse=None, all_layers=True, is
         name="e4",
     )
     flat_e4 = tf.layers.flatten(e4)
-    e5 = dense(flat_e4, 256, activation=tf.nn.relu, name="e5")
+    e5 = dense(flat_e4, int(256 * perc_units), activation=tf.nn.relu, name="e5")
     means = dense(e5, num_latent, activation=None, name="means")
     log_var = dense(e5, num_latent, activation=None, name="log_var")
     return means, log_var

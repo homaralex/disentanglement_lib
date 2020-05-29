@@ -67,6 +67,24 @@ class BaselineSparsityStudy(BaseSparsityStudy):
         return all_models
 
 
+class SmallVAEStudy(BaseSparsityStudy):
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "small_vae")
+        model_fn = h.fixed("model.model", "@vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        perc_filters = h.sweep("conv_encoder.perc_units", h.discrete([.5, .75]))
+        config_vae = h.zipit([
+            model_name,
+            beta,
+            perc_filters,
+            model_fn,
+        ])
+
+        all_models = h.chainit([config_vae, ])
+
+        return all_models
+
+
 class DimWiseL1SparsityStudy(BaseSparsityStudy):
     def __init__(
             self,

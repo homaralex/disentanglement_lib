@@ -125,6 +125,12 @@ _masked_studies = {
     for s in _sweep_masked
 }
 
+_sweep_small = h.product((_betas, _datasets))
+_small_studies = {
+    f"{s['dataset']}_small_vae_b_{s['beta']}": sparsity_study.SmallVAEStudy(**s)
+    for s in _sweep_small
+}
+
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -133,6 +139,7 @@ STUDIES = {
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
     'wae': sparsity_study.WAEStudy(dataset='dsprites_full'),
+    **_small_studies,
     **_dim_wise_studies,
     **_dim_wise_mask_studies,
     **_dim_wise_mask_studies_2,
