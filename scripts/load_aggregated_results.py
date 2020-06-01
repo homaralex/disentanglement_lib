@@ -34,14 +34,14 @@ METRICS = (
 DATASETS = (
     'dsprites_full',
     'cars3d',
-    'scream_dsprites',
-    'shapes3d',
+    # 'scream_dsprites',
+    # 'shapes3d',
 )
 METHODS = (
     'masked',
     'dim_wise_mask_l1_col',
-    'dim_wise_mask_l1_row',
-    'dim_wise_mask_l1',
+    # 'dim_wise_mask_l1_row',
+    # 'dim_wise_mask_l1',
     # 'weight_decay',
 )
 
@@ -49,8 +49,12 @@ PLOT_DIR = Path('plots')
 PLOT_DIR.mkdir(exist_ok=True)
 
 
-def read_results():
+def load_results():
     return pd.concat((pd.read_json(RESULTS_DIR / results_file) for results_file in args.result_files), sort=True)
+
+
+def get_dataset_df(df, dataset):
+    return df.loc[df[DATASET_COL_STR] == f"'{dataset}'"]
 
 
 def get_metric_df(df, metric):
@@ -61,6 +65,17 @@ def get_metric_df(df, metric):
         metric_df = df.loc[df[metric].notna()]
 
     return metric_df, metric
+
+
+def get_method_df(df, method):
+    return df.loc[df[MODEL_COL_STR].str.contains(method)]
+
+
+def get_reg_col_name(method):
+    if 'masked' in method:
+        return 'train_config.conv_encoder.perc_sparse'
+    elif 'dim_wise' in method:
+        return 'train_config.dim_wise_l1_vae.lmbd_l1'
 
 
 def plot_results(
@@ -103,7 +118,7 @@ def plot_results(
         for tick in ax_box.get_xticklabels():
             tick.set_rotation(45)
 
-        # group and aggreagate to obtain means per model
+        # group and aggregate to obtain means per model
         metric_df = metric_df.groupby(reg_weight_col)[metric].mean()
         sns.stripplot(
             x=list(map("{:.2E}".format, metric_df.index.values)),
@@ -129,11 +144,6 @@ def load_dlib_df():
 
 
 def print_rankings(df):
-    # names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
-    # df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
-    # for name, idx in names_idx_dict.items():
-    #     print(idx, name)
-
     ranking_dict = {dataset: defaultdict(list) for dataset in (DATASETS + ('all',))}
     for col_name in (
             MODEL_COL_STR,
@@ -142,7 +152,7 @@ def print_rankings(df):
         for dataset in DATASETS:
             print()
             print(dataset)
-            dset_df = df.loc[df[DATASET_COL_STR] == f"'{dataset}'"]
+            dset_df = get_dataset_df(df, dataset)
 
             for metric in METRICS:
                 metric_df, metric = get_metric_df(dset_df, metric)
@@ -165,6 +175,45 @@ def print_rankings(df):
             for name, score in ranked:
                 out_file.writelines([f'{score:.3f},  {name}\n'])
                 print(f'{score:.3f}: {name}')
+
+
+def plot_fig_15(df):
+    fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(METRICS), figsize=(30, 30))
+
+    for row_idx, dataset in enumerate(DATASETS):
+        dset_df = get_dataset_df(df, dataset)
+
+        for col_idx, metric in enumerate(METRICS):
+            ax = axes[row_idx, col_idx]
+            metric_df, metric_col_name = get_metric_df(dset_df, metric)
+
+            for method in METHODS:
+                reg_col_name = get_reg_col_name(method)
+                method_df = get_method_df(df, method)
+
+                grouped_df = method_df.groupby(reg_col_name)[metric_col_name].mean()
+
+                sns.lineplot(
+                    x=list(range(len(grouped_df))),
+                    y=grouped_df.values,
+                    ax=ax
+                )
+
+            ax_kwargs = {}
+            if row_idx == 0:
+                # TODO metric names
+                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+            if col_idx == 0:
+                ax_kwargs['ylabel'] = 'Value'
+            if row_idx == len(DATASETS) - 1:
+                ax_kwargs['xlabel'] = 'Regularization strength'
+            if col_idx == len(METRICS) - 1:
+                ax.yaxis.set_label_position('right')
+                ax_kwargs['ylabel'] = dataset
+
+            ax.set(**ax_kwargs)
+
+    plt.show()
 
 
 def main():
@@ -198,10 +247,7 @@ def main():
 
         out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
 
-        df = read_results()
-        # df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask')]
-        # print(',\n'.join(map(str, sorted(df['train_config.dim_wise_l1_vae.lmbd_l1'].unique()))))
-        # exit()
+        df = load_results()
 
         if 'dim_wise_mask_l1' in method:
             dim_wise_df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')]
@@ -257,7 +303,7 @@ def main():
                 # 0.03162277660168379,
                 0.1,
                 # 0.31622776601683794,
-                1.0,
+                # 1.0,
             ))]
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l1'
         elif method == 'masked':
@@ -270,7 +316,7 @@ def main():
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
 
         if dataset == 'shapes3d':
-            dlib_df = read_results()
+            dlib_df = load_results()
             dlib_df = dlib_df.loc[dlib_df[MODEL_COL_STR] == "'beta_vae'"]
         else:
             dlib_df = load_dlib_df()
@@ -299,7 +345,7 @@ def main():
         df_list.append(df)
 
     df = pd.concat(df_list)
-    shapes_baseline = read_results()
+    shapes_baseline = load_results()
     shapes_baseline = shapes_baseline.loc[
         (shapes_baseline[DATASET_COL_STR].str.contains('shapes3d'))
         & (shapes_baseline[MODEL_COL_STR].str.contains('beta_vae'))
@@ -307,7 +353,8 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    print_rankings(df)
+    plot_fig_15(df)
+    # print_rankings(df)
 
 
 if __name__ == '__main__':
