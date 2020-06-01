@@ -128,20 +128,11 @@ def load_dlib_df():
     return pd.read_json(DLIB_RESULTS_PATH)
 
 
-def print_rankings(df_list):
-    df = pd.concat(df_list)
-    shapes_baseline = read_results()
-    shapes_baseline = shapes_baseline.loc[
-        (shapes_baseline[DATASET_COL_STR].str.contains('shapes3d'))
-        & (shapes_baseline[MODEL_COL_STR].str.contains('beta_vae'))
-        ]
-    df = pd.concat((df, load_dlib_df(), shapes_baseline))
-    df = df.loc[df['train_config.vae.beta'] == 16]
-
-    names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
-    df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
-    for name, idx in names_idx_dict.items():
-        print(idx, name)
+def print_rankings(df):
+    # names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
+    # df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
+    # for name, idx in names_idx_dict.items():
+    #     print(idx, name)
 
     ranking_dict = {dataset: defaultdict(list) for dataset in (DATASETS + ('all',))}
     for col_name in (
@@ -208,6 +199,9 @@ def main():
         out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
 
         df = read_results()
+        # df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask')]
+        # print(',\n'.join(map(str, sorted(df['train_config.dim_wise_l1_vae.lmbd_l1'].unique()))))
+        # exit()
 
         if 'dim_wise_mask_l1' in method:
             dim_wise_df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')]
@@ -241,7 +235,30 @@ def main():
                 "{:.2e}".format)
             df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_mask_l1_', '')
             df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
-            df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-10, 1e0)]
+            # df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-10, 1e0)]
+            df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].isin((
+                # 1e-10,
+                # 3.1622776601683795e-10,
+                # 1e-09,
+                # 3.1622776601683795e-09,
+                # 1e-08,
+                # 3.162277660168379e-08,
+                # 1e-07,
+                # 4.641588833612782e-07,
+                1e-06,
+                # 3.162277660168379e-06,
+                1e-05,
+                # 3.727593720314938e-05,
+                0.0001,
+                # 0.00031622776601683794,
+                0.001,
+                # 0.0031622776601683794,
+                0.01,
+                # 0.03162277660168379,
+                0.1,
+                # 0.31622776601683794,
+                1.0,
+            ))]
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l1'
         elif method == 'masked':
             df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.conv_encoder.perc_sparse'].map(
@@ -281,7 +298,16 @@ def main():
         df = df.loc[df[reg_weight_col] != 0]
         df_list.append(df)
 
-    print_rankings(df_list)
+    df = pd.concat(df_list)
+    shapes_baseline = read_results()
+    shapes_baseline = shapes_baseline.loc[
+        (shapes_baseline[DATASET_COL_STR].str.contains('shapes3d'))
+        & (shapes_baseline[MODEL_COL_STR].str.contains('beta_vae'))
+        ]
+    df = pd.concat((df, load_dlib_df(), shapes_baseline))
+    df = df.loc[df['train_config.vae.beta'] == 16]
+
+    print_rankings(df)
 
 
 if __name__ == '__main__':
