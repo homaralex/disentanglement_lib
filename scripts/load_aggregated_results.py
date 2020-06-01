@@ -187,6 +187,7 @@ def plot_fig_15(df):
         for col_idx, metric in enumerate(METRICS):
             ax = axes[row_idx, col_idx]
             metric_df, metric_col_name = get_metric_df(dset_df, metric)
+            x_ranges = []
 
             for method in METHODS:
                 reg_col_name = get_reg_col_name(method)
@@ -194,12 +195,23 @@ def plot_fig_15(df):
 
                 grouped_df = method_df.groupby(reg_col_name)[metric_col_name].mean()
 
+                x_range = list(range(len(grouped_df)))
+                x_ranges.append(len(x_range))
                 sns.lineplot(
-                    x=list(range(len(grouped_df))),
+                    x=x_range,
                     y=grouped_df.values,
                     ax=ax,
                     label=method,
                 )
+
+            # plot baseline
+            method_df = get_method_df(metric_df, 'beta_vae')
+            sns.lineplot(
+                x=list(range(max(x_ranges))),
+                y=method_df[metric_col_name].mean(),
+                ax=ax,
+                label='beta_vae',
+            )
 
             ax.get_legend().remove()
             ax_kwargs = {}
