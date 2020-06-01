@@ -24,6 +24,7 @@ METRICS = (
     'evaluation_results.modularity_score',
     'evaluation_results.SAP_score',
     'evaluation_results.disentanglement',
+
     # 'evaluation_results.completeness',
     # 'evaluation_results.informativeness_test',
     # 'evaluation_results.explicitness_score_test',
@@ -33,15 +34,15 @@ METRICS = (
 )
 DATASETS = (
     'dsprites_full',
+    'scream_dsprites',
+    'shapes3d',
     'cars3d',
-    # 'scream_dsprites',
-    # 'shapes3d',
 )
 METHODS = (
     'masked',
     'dim_wise_mask_l1_col',
+    'dim_wise_mask_l1',
     # 'dim_wise_mask_l1_row',
-    # 'dim_wise_mask_l1',
     # 'weight_decay',
 )
 
@@ -178,7 +179,7 @@ def print_rankings(df):
 
 
 def plot_fig_15(df):
-    fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(METRICS), figsize=(30, 30))
+    fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(METRICS), figsize=(30, 20))
 
     for row_idx, dataset in enumerate(DATASETS):
         dset_df = get_dataset_df(df, dataset)
@@ -189,20 +190,33 @@ def plot_fig_15(df):
 
             for method in METHODS:
                 reg_col_name = get_reg_col_name(method)
-                method_df = get_method_df(df, method)
+                method_df = get_method_df(metric_df, method)
 
                 grouped_df = method_df.groupby(reg_col_name)[metric_col_name].mean()
 
                 sns.lineplot(
                     x=list(range(len(grouped_df))),
                     y=grouped_df.values,
-                    ax=ax
+                    ax=ax,
+                    label=method,
                 )
 
+            ax.get_legend().remove()
             ax_kwargs = {}
             if row_idx == 0:
                 # TODO metric names
                 ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+
+                if col_idx == len(METRICS) // 2:
+                    #display the legend (just once)
+                    # ax.legend(
+                    #     loc='upper center',
+                    #     bbox_to_anchor=(0, 1.5),
+                    #     ncol=len(METHODS) + 1,
+                    # )
+                    ax.legend()
+                    # handles, labels = ax.get_legend_handles_labels()
+
             if col_idx == 0:
                 ax_kwargs['ylabel'] = 'Value'
             if row_idx == len(DATASETS) - 1:
@@ -213,6 +227,12 @@ def plot_fig_15(df):
 
             ax.set(**ax_kwargs)
 
+    fig.subplots_adjust(top=2)
+    # fig.legend(handles, labels,
+    #               loc='upper center',
+    #               bbox_to_anchor=(0, 1.5),
+    #               # ncol=5,
+    #               )
     plt.show()
 
 
