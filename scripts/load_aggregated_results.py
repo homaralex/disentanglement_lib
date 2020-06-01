@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import disentanglement_lib.utils.hyperparams as h
 
 MODEL_COL_STR = 'train_config.model.name'
+DATASET_COL_STR = 'train_config.dataset.name'
 RESULTS_DIR = Path('aggregated_results')
 DLIB_RESULTS_PATH = RESULTS_DIR / 'dlib_beta_vae_results.json'
 
@@ -26,161 +27,30 @@ METRICS = (
     # 'evaluation_results.completeness',
     # 'evaluation_results.informativeness_test',
     # 'evaluation_results.explicitness_score_test',
-    'evaluation_results.mutual_info_score',
+    # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
     # 'evaluation_results.gaussian_wasserstein_correlation_norm',
 )
 DATASETS = (
     'dsprites_full',
     'cars3d',
+    'scream_dsprites',
+    'shapes3d',
 )
+METHODS = (
+    'masked',
+    'dim_wise_mask_l1_col',
+    'dim_wise_mask_l1_row',
+    'dim_wise_mask_l1',
+    # 'weight_decay',
+)
+
 PLOT_DIR = Path('plots')
 PLOT_DIR.mkdir(exist_ok=True)
 
 
-def main(result_files):
-    sweep = h.product((
-        h.sweep('dataset', DATASETS),
-        h.sweep('method', (
-            'masked',
-            'dim_wise_mask_l1_col',
-            'dim_wise_mask_l1_row',
-            'dim_wise_mask_l1',
-            # 'weight_decay',
-        )),
-        h.sweep('beta', (
-            # 1,
-            # 4,
-            # 8,
-            16,
-            # 32,
-        )),
-        h.sweep('all_layers', (
-            True,
-            False,
-        )),
-        h.sweep('scale', (
-            True,
-            False,
-        )),
-    ))
-
-    df_list = []
-    for setting in sweep:
-        dataset, method, beta, all_layers, scale = setting['dataset'], setting['method'], setting['beta'], setting[
-            'all_layers'], setting['scale']
-
-        out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
-        if scale and 'masked' in method:
-            continue
-
-        df = pd.concat((pd.read_json(RESULTS_DIR / results_file) for results_file in result_files), sort=True)
-
-        if 'dim_wise_mask_l1' in method:
-            dim_wise_df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')]
-            dim_wise_df[MODEL_COL_STR] = dim_wise_df.apply(
-                lambda row: row[MODEL_COL_STR].replace('l1', 'l1_' + row[
-                    'train_config.dim_wise_l1_vae.dim'].replace("'", '')),
-                axis=1,
-            )
-            df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')] = dim_wise_df
-
-        df = df.loc[df[MODEL_COL_STR].str.contains(method)]
-
-        if 'dim_wise_mask_l1' in method:
-            if not ('row' in method or 'col' in method):
-                # non dim wise l1
-                df = df.loc[df['train_config.dim_wise_l1_vae.dim'] == 'None']
-        idxs_all_layers = (df['train_config.dim_wise_l1_vae.all_layers'] == 'True') | (
-                df['train_config.conv_encoder.all_layers'] == 'True')
-        df = df.loc[idxs_all_layers] if all_layers else df.loc[~idxs_all_layers]
-        idxs_scale = (df['train_config.dim_wise_l1_vae.scale_per_layer'] == 'True')
-        df = df.loc[idxs_scale] if scale else df.loc[~idxs_scale]
-
-        print(dataset, out_dir.parts[1:])
-        print(len(df))
-        if len(df) < 1:
-            continue
-
-        if 'dim_wise' in method:
-            # TODO nicer way of mapping reg. strengths
-            df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.dim_wise_l1_vae.lmbd_l1'].map(
-                "{:.2e}".format)
-            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_mask_l1_', '')
-            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
-            df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-10, 1e0)]
-            reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l1'
-        elif method == 'masked':
-            df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.conv_encoder.perc_sparse'].map(
-                lambda x: round(float(x), 2)
-            ).map(str)
-            reg_weight_col = 'train_config.conv_encoder.perc_sparse'
-            df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
-        elif method == 'weight_decay':
-            reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
-
-        dlib_df = pd.read_json(DLIB_RESULTS_PATH)
-        dlib_df[reg_weight_col] = 0
-        df = pd.concat((df, dlib_df), sort=True)
-        df = df.loc[
-            (df['train_config.vae.beta'] == beta)
-            & (df['train_config.dataset.name'] == f"'{dataset}'")
-            ]
-        if len(df[MODEL_COL_STR].unique()) < 2:
-            continue
-        df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace("'", '')
-
-        # out_dir.mkdir(exist_ok=True, parents=True)
-        # plot_results(
-        #     df=df,
-        #     dataset=dataset,
-        #     out_dir=out_dir,
-        #     reg_weight_col=reg_weight_col,
-        # )
-
-        df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
-        df_list.append(df.loc[df[reg_weight_col] != 0])
-
-    df = pd.concat(df_list)
-    df = pd.concat((df, dlib_df))
-    df = df.loc[df['train_config.vae.beta'] == 16]
-
-    names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
-    df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
-    for name, idx in names_idx_dict.items():
-        print(idx, name)
-
-    ranking_dict = {dataset: defaultdict(list) for dataset in (DATASETS + ('all',))}
-    for col_name in (
-            MODEL_COL_STR,
-            # 'model_idx',
-    ):
-        for dataset in DATASETS:
-            print()
-            print(dataset)
-            dset_df = df.loc[df['train_config.dataset.name'] == f"'{dataset}'"]
-
-            for metric in METRICS:
-                metric_df, metric = get_metric_df(dset_df, metric)
-                print()
-                ranking = metric_df.groupby(col_name)[metric].mean().reset_index().sort_values(metric, ascending=False)
-                print(ranking[:5])
-
-                for idx, row in enumerate(ranking.values):
-                    model_name = row[0]
-                    ranking_dict[dataset][model_name].append(idx)
-                    ranking_dict['all'][model_name].append(idx)
-
-    with (RESULTS_DIR / 'rankings.csv').open(mode='w') as out_file:
-        for dataset in (DATASETS + ('all',)):
-            out_file.writelines([f'{dataset}\n'])
-            print(f'\nRanking for {dataset}:\n')
-
-            dset_ranking_dict = {name: sum(scores) / len(scores) for name, scores in ranking_dict[dataset].items()}
-            ranked = tuple((name, score) for name, score in sorted(dset_ranking_dict.items(), key=lambda item: item[1]))
-            for name, score in ranked:
-                out_file.writelines([f'{score:.3f},  {name}\n'])
-                print(f'{score:.3f}: {name}')
+def read_results():
+    return pd.concat((pd.read_json(RESULTS_DIR / results_file) for results_file in args.result_files), sort=True)
 
 
 def get_metric_df(df, metric):
@@ -254,9 +124,169 @@ def plot_results(
         plt.close(fig)
 
 
+def load_dlib_df():
+    return pd.read_json(DLIB_RESULTS_PATH)
+
+
+def print_rankings(df_list):
+    df = pd.concat(df_list)
+    shapes_baseline = read_results()
+    shapes_baseline = shapes_baseline.loc[
+        (shapes_baseline[DATASET_COL_STR].str.contains('shapes3d'))
+        & (shapes_baseline[MODEL_COL_STR].str.contains('beta_vae'))
+        ]
+    df = pd.concat((df, load_dlib_df(), shapes_baseline))
+    df = df.loc[df['train_config.vae.beta'] == 16]
+
+    names_idx_dict = dict((name, idx) for idx, name in enumerate(df[MODEL_COL_STR].unique()))
+    df['model_idx'] = df[MODEL_COL_STR].map(lambda x: names_idx_dict[x])
+    for name, idx in names_idx_dict.items():
+        print(idx, name)
+
+    ranking_dict = {dataset: defaultdict(list) for dataset in (DATASETS + ('all',))}
+    for col_name in (
+            MODEL_COL_STR,
+            # 'model_idx',
+    ):
+        for dataset in DATASETS:
+            print()
+            print(dataset)
+            dset_df = df.loc[df[DATASET_COL_STR] == f"'{dataset}'"]
+
+            for metric in METRICS:
+                metric_df, metric = get_metric_df(dset_df, metric)
+                print()
+                ranking = metric_df.groupby(col_name)[metric].mean().reset_index().sort_values(metric, ascending=False)
+                print(ranking[:5])
+
+                for idx, row in enumerate(ranking.values):
+                    model_name = row[0]
+                    ranking_dict[dataset][model_name].append(idx)
+                    ranking_dict['all'][model_name].append(idx)
+
+    with (RESULTS_DIR / 'rankings.csv').open(mode='w') as out_file:
+        for dataset in (DATASETS + ('all',)):
+            out_file.writelines([f'{dataset}\n'])
+            print(f'\nRanking for {dataset}:\n')
+
+            dset_ranking_dict = {name: sum(scores) / len(scores) for name, scores in ranking_dict[dataset].items()}
+            ranked = tuple((name, score) for name, score in sorted(dset_ranking_dict.items(), key=lambda item: item[1]))
+            for name, score in ranked:
+                out_file.writelines([f'{score:.3f},  {name}\n'])
+                print(f'{score:.3f}: {name}')
+
+
+def main():
+    sweep = h.product((
+        h.sweep('dataset', DATASETS),
+        h.sweep('method', METHODS),
+        h.sweep('beta', (
+            # 1,
+            # 4,
+            # 8,
+            16,
+            # 32,
+        )),
+        h.sweep('all_layers', (
+            True,
+            # False,
+        )),
+        h.sweep('scale', (
+            True,
+            # False,
+        )),
+    ))
+
+    df_list = []
+    for setting in sweep:
+        dataset, method, beta, all_layers, scale = setting['dataset'], setting['method'], setting['beta'], setting[
+            'all_layers'], setting['scale']
+
+        if 'masked' in method:
+            scale = False
+
+        out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
+
+        df = read_results()
+
+        if 'dim_wise_mask_l1' in method:
+            dim_wise_df = df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')]
+            dim_wise_df[MODEL_COL_STR] = dim_wise_df.apply(
+                lambda row: row[MODEL_COL_STR].replace('l1', 'l1_' + row[
+                    'train_config.dim_wise_l1_vae.dim'].replace("'", '')),
+                axis=1,
+            )
+            df.loc[df[MODEL_COL_STR].str.contains('dim_wise_mask_l1')] = dim_wise_df
+
+        df = df.loc[df[MODEL_COL_STR].str.contains(method)]
+
+        if 'dim_wise_mask_l1' in method:
+            if not ('row' in method or 'col' in method):
+                # non dim wise l1
+                df = df.loc[df['train_config.dim_wise_l1_vae.dim'] == 'None']
+        idxs_all_layers = (df['train_config.dim_wise_l1_vae.all_layers'] == 'True') | (
+                df['train_config.conv_encoder.all_layers'] == 'True')
+        df = df.loc[idxs_all_layers] if all_layers else df.loc[~idxs_all_layers]
+        idxs_scale = (df['train_config.dim_wise_l1_vae.scale_per_layer'] == 'True')
+        df = df.loc[idxs_scale] if scale else df.loc[~idxs_scale]
+
+        print(dataset, out_dir.parts[1:])
+        print(len(df))
+        if len(df) < 1:
+            continue
+
+        if 'dim_wise' in method:
+            # TODO nicer way of mapping reg. strengths
+            df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.dim_wise_l1_vae.lmbd_l1'].map(
+                "{:.2e}".format)
+            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('dim_wise_mask_l1_', '')
+            df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace('_vae', '')
+            df = df.loc[df['train_config.dim_wise_l1_vae.lmbd_l1'].between(1e-10, 1e0)]
+            reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l1'
+        elif method == 'masked':
+            df[MODEL_COL_STR] = df[MODEL_COL_STR] + '_' + df['train_config.conv_encoder.perc_sparse'].map(
+                lambda x: round(float(x), 2)
+            ).map(str)
+            reg_weight_col = 'train_config.conv_encoder.perc_sparse'
+            df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
+        elif method == 'weight_decay':
+            reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
+
+        if dataset == 'shapes3d':
+            dlib_df = read_results()
+            dlib_df = dlib_df.loc[dlib_df[MODEL_COL_STR] == "'beta_vae'"]
+        else:
+            dlib_df = load_dlib_df()
+
+        dlib_df[reg_weight_col] = 0
+        df = pd.concat((df, dlib_df), sort=True)
+        df = df.loc[
+            (df['train_config.vae.beta'] == beta)
+            & (df[DATASET_COL_STR] == f"'{dataset}'")
+            ]
+        if len(df[MODEL_COL_STR].unique()) < 2:
+            continue
+        df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace("'", '')
+
+        # out_dir.mkdir(exist_ok=True, parents=True)
+        # plot_results(
+        #     df=df,
+        #     dataset=dataset,
+        #     out_dir=out_dir,
+        #     reg_weight_col=reg_weight_col,
+        # )
+
+        df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
+
+        df = df.loc[df[reg_weight_col] != 0]
+        df_list.append(df)
+
+    print_rankings(df_list)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('result_files', type=str, nargs='+', )
     args = parser.parse_args()
 
-    main(args.result_files)
+    main()
