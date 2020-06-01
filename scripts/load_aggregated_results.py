@@ -245,7 +245,9 @@ def plot_fig_15(df):
     #               bbox_to_anchor=(0, 1.5),
     #               # ncol=5,
     #               )
+    plt.savefig(PLOT_DIR / 'fig_15.png')
     plt.show()
+    fig.close()
 
 
 def main():
