@@ -52,13 +52,13 @@ class BaseSparsityStudy(study.Study):
 
 class BaselineSparsityStudy(BaseSparsityStudy):
     def get_default_models(self):
-        # Baseline VAE
+        # Baseline beta VAE
         model_name = h.fixed("model.name", "beta_vae")
         model_fn = h.fixed("model.model", "@vae()")
-        # betas = h.sweep("vae.beta", h.discrete([1., 2., 4., 6., 8., 16.]))
+        beta = h.fixed('vae.beta', self.beta)
         config_vae = h.zipit([
             model_name,
-            # betas,
+            beta,
             model_fn,
         ])
 

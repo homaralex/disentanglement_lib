@@ -131,6 +131,12 @@ _small_studies = {
     for s in _sweep_small
 }
 
+_sweep_baseline = h.product((_betas, _datasets))
+_baseline_studies = {
+    f"{s['dataset']}_baseline_b_{s['beta']}": sparsity_study.BaselineSparsityStudy(**s)
+    for s in _sweep_baseline
+}
+
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -154,4 +160,5 @@ STUDIES = {
     **_mask_l1_studies_5,
     **_weight_decay_studies,
     **_masked_studies,
+    **_baseline_studies,
 }
