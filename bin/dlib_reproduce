@@ -95,6 +95,10 @@ def main(unused_argv):
             logging.info(output_directory)
             continue
 
+        if hasattr(study, 'skip_study') and study.skip_study(model_num):
+            logging.info("Skipping study because of model_num - continuing.")
+            continue
+
         # Model training (if model directory is not provided).
         if FLAGS.model_dir is None:
             model_bindings, model_config_file = study.get_model_config(model_num)

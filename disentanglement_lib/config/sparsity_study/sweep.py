@@ -49,6 +49,8 @@ class BaseSparsityStudy(study.Study):
         """Returns evaluation config files."""
         return list(resources.get_files_in_folder("config/unsupervised_study_v1/metric_configs/"))
 
+    def skip_study(self, model_num):
+        return True
 
 class BaselineSparsityStudy(BaseSparsityStudy):
     def get_default_models(self):
@@ -188,6 +190,12 @@ class DimWiseMaskL1Study(DimWiseL1SparsityStudy):
         all_models = h.chainit([config_masked_l1, ])
 
         return all_models
+
+    def skip_study(self, model_num):
+        config = self.get_config()[model_num]
+        # only run models with reg strength equal to a power of 10
+        # TODO remove this in final version
+        return np.log10(config['dim_wise_l1_vae.lmbd_l1']) % 1 != 0
 
 
 class WeigthDecaystudy(DimWiseMaskL1Study):
