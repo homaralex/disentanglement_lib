@@ -2,6 +2,7 @@ import argparse
 from collections import defaultdict
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -17,7 +18,7 @@ pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
-METRICS = (
+DIS_METRICS = (
     'beta_vae_sklearn',
     'factor_vae_metric',
     'evaluation_results.discrete_mig',
@@ -25,12 +26,21 @@ METRICS = (
     'evaluation_results.SAP_score',
     'evaluation_results.disentanglement',
 
+    # 'train_results.loss',
+    # 'train_results.regularizer',
+
     # 'evaluation_results.completeness',
     # 'evaluation_results.informativeness_test',
     # 'evaluation_results.explicitness_score_test',
+
     # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
     # 'evaluation_results.gaussian_wasserstein_correlation_norm',
+)
+UNSUP_METRICS = (
+    'train_results.reconstruction_loss',
+    'train_results.kl_loss',
+    'train_results.elbo',
 )
 DATASETS = (
     'dsprites_full',
@@ -89,7 +99,7 @@ def plot_results(
     fig_box, axes_box = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     fig_mean, axes_mean = plt.subplots(nrows=3, ncols=4, figsize=(30, 30))
     for metric, ax_violin, ax_box, ax_mean in zip(
-            METRICS,
+            DIS_METRICS,
             axes_violin.flatten(),
             axes_box.flatten(),
             axes_mean.flatten(),
@@ -155,7 +165,7 @@ def print_rankings(df):
             print(dataset)
             dset_df = get_dataset_df(df, dataset)
 
-            for metric in METRICS:
+            for metric in DIS_METRICS:
                 metric_df, metric = get_metric_df(dset_df, metric)
                 print()
                 ranking = metric_df.groupby(col_name)[metric].mean().reset_index().sort_values(metric, ascending=False)
@@ -179,12 +189,12 @@ def print_rankings(df):
 
 
 def plot_fig_15(df):
-    fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(METRICS), figsize=(30, 20))
+    fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(DIS_METRICS), figsize=(30, 20))
 
     for row_idx, dataset in enumerate(DATASETS):
         dset_df = get_dataset_df(df, dataset)
 
-        for col_idx, metric in enumerate(METRICS):
+        for col_idx, metric in enumerate(DIS_METRICS):
             ax = axes[row_idx, col_idx]
             metric_df, metric_col_name = get_metric_df(dset_df, metric)
             x_ranges = []
@@ -202,6 +212,7 @@ def plot_fig_15(df):
                     y=grouped_df.values,
                     ax=ax,
                     label=method,
+                    linewidth=4,
                 )
 
             # plot baseline
@@ -211,16 +222,18 @@ def plot_fig_15(df):
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
                 label='beta_vae',
+                linewidth=4,
             )
 
             ax.get_legend().remove()
+            ax.grid()
             ax_kwargs = {}
             if row_idx == 0:
                 # TODO metric names
                 ax_kwargs['title'] = metric.replace('evaluation_results.', '')
 
-                if col_idx == len(METRICS) // 2:
-                    #display the legend (just once)
+                if col_idx == len(DIS_METRICS) // 2:
+                    # display the legend (just once)
                     # ax.legend(
                     #     loc='upper center',
                     #     bbox_to_anchor=(0, 1.5),
@@ -233,13 +246,17 @@ def plot_fig_15(df):
                 ax_kwargs['ylabel'] = 'Value'
             if row_idx == len(DATASETS) - 1:
                 ax_kwargs['xlabel'] = 'Regularization strength'
-            if col_idx == len(METRICS) - 1:
+            if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
                 ax_kwargs['ylabel'] = dataset
 
             ax.set(**ax_kwargs)
 
-    fig.subplots_adjust(top=2)
+    # fig.subplots_adjust(top=0.9, left=0.1, right=0.9,
+    #                     bottom=0.52)  # create some space below the plots by increasing the bottom-value
+    # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.52), ncol=len(METHODS) + 1)
+
+    # fig.subplots_adjust(top=2)
     # fig.legend(handles, labels,
     #               loc='upper center',
     #               bbox_to_anchor=(0, 1.5),
@@ -247,7 +264,47 @@ def plot_fig_15(df):
     #               )
     plt.savefig(PLOT_DIR / 'fig_15.png')
     plt.show()
-    fig.close()
+    plt.close(fig)
+
+
+def plot_rank_corr_matrices(df):
+    fig, axes = plt.subplots(nrows=len(METHODS), ncols=len(DIS_METRICS), figsize=(30, 20))
+
+    for row_idx, method in enumerate(METHODS):
+        method_df = get_method_df(df, method)
+        reg_col_name = get_reg_col_name(method)
+
+        for col_idx, metric in enumerate(DIS_METRICS):
+            ax = axes[row_idx, col_idx]
+            metric_df, metric_col_name = get_metric_df(method_df, metric)
+
+            grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[
+                metric_col_name].mean().reset_index().sort_values(reg_col_name)
+            grouped_df = pd.DataFrame({dataset: get_dataset_df(grouped_df, dataset)[metric_col_name].values for dataset in DATASETS}, dtype=np.float)
+            print(grouped_df)
+            corr = grouped_df.corr(method='spearman').fillna(0)
+
+            sns.heatmap(
+                data=corr,
+                annot=True,
+                cmap=sns.color_palette("coolwarm", 7),
+                cbar=False,
+                ax=ax,
+            )
+
+            ax_kwargs = {}
+            if row_idx == 0:
+                # TODO metric names
+                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+            if col_idx == len(DIS_METRICS) - 1:
+                ax.yaxis.set_label_position('right')
+                ax_kwargs['ylabel'] = method
+
+            ax.set(**ax_kwargs)
+
+    plt.savefig(PLOT_DIR / 'fig_17.png')
+    plt.show()
+    plt.close(fig)
 
 
 def main():
@@ -335,7 +392,8 @@ def main():
                 # 0.0031622776601683794,
                 0.01,
                 # 0.03162277660168379,
-                0.1,
+                # TODO
+                # 0.1,
                 # 0.31622776601683794,
                 # 1.0,
             ))]
@@ -387,7 +445,9 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    plot_fig_15(df)
+    plot_rank_corr_matrices(df)
+    # plot_fig_15(df)
+
     # print_rankings(df)
 
 
