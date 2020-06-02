@@ -280,15 +280,22 @@ def plot_rank_corr_matrices(df):
 
             grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[
                 metric_col_name].mean().reset_index().sort_values(reg_col_name)
-            grouped_df = pd.DataFrame({dataset: get_dataset_df(grouped_df, dataset)[metric_col_name].values for dataset in DATASETS}, dtype=np.float)
-            print(grouped_df)
-            corr = grouped_df.corr(method='spearman').fillna(0)
+            grouped_df = pd.DataFrame(
+                {dataset: get_dataset_df(grouped_df, dataset)[metric_col_name].values for dataset in DATASETS},
+                dtype=np.float)
+            for dataset in DATASETS:
+                if grouped_df[dataset].std() == 0:
+                    grouped_df[dataset][0] = grouped_df[dataset][0] * .999999
+
+            corr = grouped_df.corr(method='pearson')
 
             sns.heatmap(
                 data=corr,
                 annot=True,
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
+                xticklabels=(row_idx == len(METHODS) - 1),
+                yticklabels=(col_idx == 0),
                 ax=ax,
             )
 
