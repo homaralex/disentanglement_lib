@@ -50,7 +50,7 @@ class BaseSparsityStudy(study.Study):
         return list(resources.get_files_in_folder("config/unsupervised_study_v1/metric_configs/"))
 
     def skip_study(self, model_num):
-        return True
+        return False
 
 class BaselineSparsityStudy(BaseSparsityStudy):
     def get_default_models(self):
