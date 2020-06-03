@@ -87,6 +87,9 @@ def get_reg_col_name(method):
         return 'train_config.conv_encoder.perc_sparse'
     elif 'dim_wise' in method:
         return 'train_config.dim_wise_l1_vae.lmbd_l1'
+    elif 'beta_vae' in method:
+        return 'train_config.vae.beta'
+    raise ValueError(method)
 
 
 def plot_results(
@@ -268,7 +271,7 @@ def plot_fig_15(df):
 
 
 def plot_fig_16(df):
-    methods = METHODS + ('beta_vae', )
+    methods = METHODS + ('beta_vae',)
     fig, axes = plt.subplots(nrows=1, ncols=len(methods), figsize=(30, 10))
 
     for ax_idx, method in enumerate(methods):
@@ -303,9 +306,10 @@ def plot_fig_16(df):
 
 
 def plot_fig_17(df):
-    fig, axes = plt.subplots(nrows=len(METHODS), ncols=len(DIS_METRICS), figsize=(30, 20))
+    methods = METHODS + ('beta_vae',)
+    fig, axes = plt.subplots(nrows=len(methods), ncols=len(DIS_METRICS), figsize=(30, 20))
 
-    for row_idx, method in enumerate(METHODS):
+    for row_idx, method in enumerate(methods):
         method_df = get_method_df(df, method)
         reg_col_name = get_reg_col_name(method)
 
@@ -313,11 +317,39 @@ def plot_fig_17(df):
             ax = axes[row_idx, col_idx]
             metric_df, metric_col_name = get_metric_df(method_df, metric)
 
-            grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[
-                metric_col_name].mean().reset_index().sort_values(reg_col_name)
-            grouped_df = pd.DataFrame(
-                {dataset: get_dataset_df(grouped_df, dataset)[metric_col_name].values for dataset in DATASETS},
-                dtype=np.float)
+            if 'beta_vae' in method:
+                shapes3d_df = pd.concat([get_dataset_df(metric_df, 'shapes3d')] * 8).head(50)
+                metric_df = pd.concat([metric_df.loc[metric_df[DATASET_COL_STR] != 'shapes3d'], shapes3d_df])
+                grouped_df = metric_df
+                grouped_df = pd.DataFrame(
+                    {dataset: get_dataset_df(grouped_df, dataset)[metric_col_name].head(7).values for dataset in
+                     DATASETS},
+                    dtype=np.float)
+            else:
+                grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[metric_col_name].mean().reset_index()#.sort_values(reg_col_name)
+                grouped_df = pd.DataFrame(
+                    {dataset: get_dataset_df(grouped_df, dataset).sort_values(reg_col_name)[metric_col_name].values for
+                     dataset in DATASETS},
+                    dtype=np.float)
+
+                # grouped_df = pd.concat(tuple(
+                #     metric_df.loc[metric_df[reg_col_name] == reg_val].sort_values(DATASET_COL_STR).head(12) for reg_val
+                #     in metric_df[reg_col_name].unique()))
+
+                # slices = []
+                # for dset in DATASETS:
+                #     for reg_val in metric_df[reg_col_name].unique():
+                #         slice_df = get_dataset_df(metric_df, dset)
+                #         slice_df = slice_df.loc[slice_df[reg_col_name] == reg_val]
+                #         slices.append(slice_df)
+                # min_len = min(map(len, slices))
+                # grouped_df = pd.concat(tuple(slice.head(min_len) for slice in slices))
+                #
+                # grouped_df = pd.DataFrame(
+                #     {dataset: get_dataset_df(grouped_df, dataset).sort_values(reg_col_name)[metric_col_name].values for
+                #      dataset in DATASETS},
+                #     dtype=np.float)
+
             for dataset in DATASETS:
                 if grouped_df[dataset].std() == 0:
                     grouped_df[dataset][0] = grouped_df[dataset][0] * .999999
@@ -329,7 +361,7 @@ def plot_fig_17(df):
                 annot=True,
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
-                xticklabels=(row_idx == len(METHODS) - 1),
+                xticklabels=(row_idx == len(methods) - 1),
                 yticklabels=(col_idx == 0),
                 ax=ax,
             )
@@ -488,8 +520,8 @@ def main():
     df = df.loc[df['train_config.vae.beta'] == 16]
 
     # plot_fig_15(df)
-    plot_fig_16(df)
-    # plot_fig_17(df)
+    # plot_fig_16(df)
+    plot_fig_17(df)
 
     # print_rankings(df)
 
