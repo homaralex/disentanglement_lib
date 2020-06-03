@@ -45,15 +45,16 @@ UNSUP_METRICS = (
 DATASETS = (
     'dsprites_full',
     'scream_dsprites',
-    'shapes3d',
-    'cars3d',
+    # 'shapes3d',
+    # 'cars3d',
 )
 METHODS = (
     'masked',
-    'dim_wise_mask_l1_col',
-    'dim_wise_mask_l1',
+    # 'dim_wise_mask_l1_col',
+    # 'dim_wise_mask_l1',
     # 'dim_wise_mask_l1_row',
-    # 'weight_decay',
+    'small_vae',
+    'weight_decay',
 )
 
 PLOT_DIR = Path('plots')
@@ -89,6 +90,10 @@ def get_reg_col_name(method):
         return 'train_config.dim_wise_l1_vae.lmbd_l1'
     elif 'beta_vae' in method:
         return 'train_config.vae.beta'
+    elif 'weight_decay' in method:
+        return 'train_config.dim_wise_l1_vae.lmbd_l2'
+    elif 'small_vae' in method:
+        return 'train_config.conv_encoder.perc_units'
     raise ValueError(method)
 
 
@@ -203,6 +208,9 @@ def plot_fig_15(df):
             x_ranges = []
 
             for method in METHODS:
+                if 'weight_decay' in method or 'small' in method:
+                    continue
+
                 reg_col_name = get_reg_col_name(method)
                 method_df = get_method_df(metric_df, method)
 
@@ -211,8 +219,8 @@ def plot_fig_15(df):
                 x_range = list(range(len(grouped_df)))
                 x_ranges.append(len(x_range))
                 sns.lineplot(
-                    x=x_range,
-                    y=grouped_df.values,
+                    x=(0, 5) if 'small' in method else x_range,
+                    y=(grouped_df.iloc[::-1] if 'small' in method else grouped_df).values,
                     ax=ax,
                     label=method,
                     linewidth=4,
@@ -227,6 +235,24 @@ def plot_fig_15(df):
                 label='beta_vae',
                 linewidth=4,
             )
+            method_df = get_method_df(metric_df, 'weight_decay')
+            sns.lineplot(
+                x=list(range(max(x_ranges))),
+                y=method_df[metric_col_name].mean(),
+                ax=ax,
+                label='weight_decay',
+                linewidth=4,
+            )
+            for perc_units in (.5, .75):
+                method_df = get_method_df(metric_df, 'small_vae')
+                method_df = method_df.loc[method_df[get_reg_col_name('small_vae')] == perc_units]
+                sns.lineplot(
+                    x=list(range(max(x_ranges))),
+                    y=method_df[metric_col_name].mean(),
+                    ax=ax,
+                    label=f'small_vae_{perc_units}',
+                    linewidth=4,
+                )
 
             ax.get_legend().remove()
             ax.grid()
@@ -458,7 +484,7 @@ def main():
         dataset, method, beta, all_layers, scale = setting['dataset'], setting['method'], setting['beta'], setting[
             'all_layers'], setting['scale']
 
-        if 'masked' in method:
+        if 'masked' in method or 'small' in method or 'weight_decay' in method:
             scale = False
 
         out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
@@ -529,8 +555,10 @@ def main():
             ).map(str)
             reg_weight_col = 'train_config.conv_encoder.perc_sparse'
             df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
-        elif method == 'weight_decay':
+        elif 'weight_decay' in method:
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
+        elif 'small_vae' in method:
+            reg_weight_col = 'train_config.conv_encoder.perc_units'
 
         if dataset == 'shapes3d':
             dlib_df = load_results()
@@ -570,10 +598,10 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    # plot_fig_15(df)
+    plot_fig_15(df)
     # plot_fig_16(df)
     # plot_fig_17(df)
-    plot_fig_18(df)
+    # plot_fig_18(df)
 
     # print_rankings(df)
 
