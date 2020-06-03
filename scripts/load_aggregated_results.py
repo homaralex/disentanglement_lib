@@ -29,9 +29,9 @@ DIS_METRICS = (
     # 'train_results.loss',
     # 'train_results.regularizer',
 
-    'evaluation_results.completeness',
-    'evaluation_results.informativeness_test',
-    'evaluation_results.explicitness_score_test',
+    # 'evaluation_results.completeness',
+    # 'evaluation_results.informativeness_test',
+    # 'evaluation_results.explicitness_score_test',
 
     # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
@@ -326,7 +326,7 @@ def plot_fig_17(df):
                      DATASETS},
                     dtype=np.float)
             else:
-                grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[metric_col_name].mean().reset_index()#.sort_values(reg_col_name)
+                grouped_df = metric_df.groupby((DATASET_COL_STR, reg_col_name))[metric_col_name].mean().reset_index()
                 grouped_df = pd.DataFrame(
                     {dataset: get_dataset_df(grouped_df, dataset).sort_values(reg_col_name)[metric_col_name].values for
                      dataset in DATASETS},
@@ -377,6 +377,57 @@ def plot_fig_17(df):
             ax.set(**ax_kwargs)
 
     plt.savefig(PLOT_DIR / 'fig_17.png')
+    plt.show()
+    plt.close(fig)
+
+
+def plot_fig_18(df):
+    datasets = DATASETS[1:]
+    fig, axes = plt.subplots(nrows=len(datasets), ncols=len(DIS_METRICS), figsize=(30, 20))
+
+    for col_idx, metric in enumerate(DIS_METRICS):
+        metric_df, metric_col_name = get_metric_df(df, metric)
+        dsprites_df = get_dataset_df(metric_df, 'dsprites_full')
+
+        for row_idx, dataset in enumerate(datasets):
+            ax = axes[row_idx, col_idx]
+            dataset_df = get_dataset_df(metric_df, dataset)
+
+            for method in METHODS:
+                reg_col_name = get_reg_col_name(method)
+                method_df = get_method_df(dataset_df, method).groupby(reg_col_name)[metric_col_name].mean()
+                dsprites_method_df = get_method_df(dsprites_df, method).groupby(reg_col_name)[metric_col_name].mean()
+
+                sns.scatterplot(
+                    x=dsprites_method_df.values,
+                    y=method_df.values,
+                    label=method,
+                    s=128,
+                    marker=('o' if 'col' in method else ('^' if 'l1' in method else 's')),
+                    ax=ax,
+                )
+
+            ax.get_legend().remove()
+            ax.grid()
+            ax_kwargs = {}
+            if row_idx == 0:
+                # TODO metric names
+                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+
+                if col_idx == len(DIS_METRICS) // 2:
+                    ax.legend()
+
+            if col_idx == 0:
+                ax_kwargs['ylabel'] = 'Value'
+            if row_idx == len(datasets) - 1:
+                ax_kwargs['xlabel'] = 'dSprites'
+            if col_idx == len(DIS_METRICS) - 1:
+                ax.yaxis.set_label_position('right')
+                ax_kwargs['ylabel'] = dataset
+
+            ax.set(**ax_kwargs)
+
+    plt.savefig(PLOT_DIR / 'fig_18.png')
     plt.show()
     plt.close(fig)
 
@@ -521,7 +572,8 @@ def main():
 
     # plot_fig_15(df)
     # plot_fig_16(df)
-    plot_fig_17(df)
+    # plot_fig_17(df)
+    plot_fig_18(df)
 
     # print_rankings(df)
 
