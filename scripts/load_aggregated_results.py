@@ -45,16 +45,16 @@ UNSUP_METRICS = (
 DATASETS = (
     'dsprites_full',
     'scream_dsprites',
-    # 'shapes3d',
-    # 'cars3d',
+    'shapes3d',
+    'cars3d',
 )
 METHODS = (
     'masked',
-    # 'dim_wise_mask_l1_col',
-    # 'dim_wise_mask_l1',
-    # 'dim_wise_mask_l1_row',
+    'dim_wise_mask_l1_col',
+    'dim_wise_mask_l1',
     'small_vae',
     'weight_decay',
+    # 'dim_wise_mask_l1_row',
 )
 
 PLOT_DIR = Path('plots')
@@ -226,24 +226,25 @@ def plot_fig_15(df):
                     linewidth=4,
                 )
 
-            # plot baseline
+            # plot baselines
             method_df = get_method_df(metric_df, 'beta_vae')
             sns.lineplot(
                 x=list(range(max(x_ranges))),
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
                 label='beta_vae',
-                linewidth=4,
             )
+            ax.lines[-1].set_linestyle((0, (5, 5)))
             method_df = get_method_df(metric_df, 'weight_decay')
             sns.lineplot(
                 x=list(range(max(x_ranges))),
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
                 label='weight_decay',
-                linewidth=4,
+                linewidth=3,
+                color='goldenrod',
             )
-            for perc_units in (.5, .75):
+            for perc_units, color in ((.5, 'crimson'), (.75, 'deeppink')):
                 method_df = get_method_df(metric_df, 'small_vae')
                 method_df = method_df.loc[method_df[get_reg_col_name('small_vae')] == perc_units]
                 sns.lineplot(
@@ -251,7 +252,8 @@ def plot_fig_15(df):
                     y=method_df[metric_col_name].mean(),
                     ax=ax,
                     label=f'small_vae_{perc_units}',
-                    linewidth=4,
+                    linewidth=3,
+                    color=color,
                 )
 
             ax.get_legend().remove()
@@ -544,7 +546,7 @@ def main():
                 0.01,
                 # 0.03162277660168379,
                 # TODO
-                # 0.1,
+                0.1,
                 # 0.31622776601683794,
                 # 1.0,
             ))]
