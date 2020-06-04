@@ -126,7 +126,7 @@ _mask_l1_studies_7 = {
 }
 
 _weight_decay_studies = {
-    f"{s['dataset']}_weight_decay_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.WeigthDecaystudy(
+    f"{s['dataset']}_weight_decay_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.WeigthDecayStudy(
         lmbd_l2_range=(.01,),
         **s)
     for s in _sweep_dim_wise

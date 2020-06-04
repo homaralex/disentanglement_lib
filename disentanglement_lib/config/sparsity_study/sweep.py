@@ -198,7 +198,7 @@ class DimWiseMaskL1Study(DimWiseL1SparsityStudy):
         return np.log10(config['dim_wise_l1_vae.lmbd_l1']) % 1 != 0
 
 
-class WeigthDecaystudy(DimWiseMaskL1Study):
+class WeigthDecayStudy(DimWiseMaskL1Study):
     def __init__(self, lmbd_l2_range=(.01,), *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -236,6 +236,9 @@ class WeigthDecaystudy(DimWiseMaskL1Study):
         all_models = h.chainit([config_weight_decay, ])
 
         return all_models
+
+    def skip_study(self, model_num):
+        return False
 
 
 class MaskL1Study(DimWiseMaskL1Study):
