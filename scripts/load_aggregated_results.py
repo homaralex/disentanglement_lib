@@ -57,6 +57,32 @@ METHODS = (
     # 'dim_wise_mask_l1_row',
 )
 
+HUMAN_READABLE_NAMES = {
+    # methods
+    'masked': 'RPM',
+    'dim_wise_mask_l1_col': 'Dim-Wise LL1M',
+    'dim_wise_mask_l1': 'LL1M',
+    'small_vae': 'Small-VAE',
+    'weight_decay': 'Weight Decay',
+    'beta_vae': 'BetaVAE',
+    # datasets
+    'dsprites_full': 'dSprites',
+    'scream_dsprites': 'Scream-dSprites',
+    'shapes3d': 'Shapes3D',
+    'cars3d': 'Cars3D',
+    # unsup metrics
+    'train_results.reconstruction_loss': 'Reconstruction',
+    'train_results.kl_loss': 'KL',
+    'train_results.elbo': 'ELBO',
+    # dis metrics
+    'beta_vae_sklearn': 'BetaVAE Score',
+    'factor_vae_metric': 'FactorVAE Score',
+    'evaluation_results.discrete_mig': 'MIG',
+    'evaluation_results.disentanglement': 'DCI Disentanglement',
+    'evaluation_results.modularity_score': 'Modularity',
+    'evaluation_results.SAP_score': 'SAP Score',
+}
+
 PLOT_DIR = Path('plots')
 PLOT_DIR.mkdir(exist_ok=True)
 
@@ -232,7 +258,7 @@ def plot_fig_15(df, methods=METHODS):
                 x=list(range(max(x_ranges))),
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
-                label='beta_vae',
+                label=HUMAN_READABLE_NAMES['beta_vae'],
                 zorder=10,
                 color='black',
             )
@@ -242,7 +268,7 @@ def plot_fig_15(df, methods=METHODS):
                 x=list(range(max(x_ranges))),
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
-                label='weight_decay',
+                label=HUMAN_READABLE_NAMES['weight_decay'],
                 linewidth=3,
                 color='goldenrod',
                 zorder=0,
@@ -254,7 +280,7 @@ def plot_fig_15(df, methods=METHODS):
                     x=list(range(max(x_ranges))),
                     y=method_df[metric_col_name].mean(),
                     ax=ax,
-                    label=f'small_vae_{perc_units}',
+                    label=f'{HUMAN_READABLE_NAMES["small_vae"]} {perc_units}',
                     linewidth=3,
                     color=color,
                     zorder=0,
@@ -264,8 +290,7 @@ def plot_fig_15(df, methods=METHODS):
             ax.grid()
             ax_kwargs = {}
             if row_idx == 0:
-                # TODO metric names
-                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+                ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
 
                 if col_idx == len(DIS_METRICS) // 2:
                     # display the legend (just once)
@@ -283,7 +308,7 @@ def plot_fig_15(df, methods=METHODS):
                 ax_kwargs['xlabel'] = 'Regularization strength'
             if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
-                ax_kwargs['ylabel'] = dataset
+                ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[dataset]
 
             ax.set(**ax_kwargs)
 
@@ -326,14 +351,13 @@ def plot_fig_16(df, methods=METHODS):
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
                 square=True,
-                xticklabels=(tuple(metric_name.replace('evaluation_results.', '') for metric_name in
-                                   DIS_METRICS) if row_idx == 1 else False),
+                xticklabels=(
+                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in DIS_METRICS) if row_idx == 1 else False),
                 yticklabels=(tuple(
-                    metric_name.replace('train_results.', '') for metric_name in
-                    UNSUP_METRICS) if col_idx == 0 else False),
+                    HUMAN_READABLE_NAMES[metric_name] for metric_name in UNSUP_METRICS) if col_idx == 0 else False),
                 ax=ax,
             )
-            ax.set_title(method)
+            ax.set_title(HUMAN_READABLE_NAMES[method])
 
     plt.savefig(PLOT_DIR / 'fig_16.png')
     plt.show()
@@ -391,6 +415,11 @@ def plot_fig_17(df, methods=METHODS):
 
             corr = grouped_df.corr(method='pearson')
 
+            corr.rename(
+                columns=lambda c: HUMAN_READABLE_NAMES[c],
+                index=lambda i: HUMAN_READABLE_NAMES[i],
+                inplace=True,
+            )
             sns.heatmap(
                 data=corr,
                 annot=True,
@@ -403,11 +432,10 @@ def plot_fig_17(df, methods=METHODS):
 
             ax_kwargs = {}
             if row_idx == 0:
-                # TODO metric names
-                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+                ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
             if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
-                ax_kwargs['ylabel'] = method
+                ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[method]
 
             ax.set(**ax_kwargs)
 
@@ -448,8 +476,7 @@ def plot_fig_18(df, methods=METHODS):
             ax.grid()
             ax_kwargs = {}
             if row_idx == 0:
-                # TODO metric names
-                ax_kwargs['title'] = metric.replace('evaluation_results.', '')
+                ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
 
                 if col_idx == len(DIS_METRICS) // 2:
                     ax.legend()
@@ -460,7 +487,7 @@ def plot_fig_18(df, methods=METHODS):
                 ax_kwargs['xlabel'] = 'dSprites'
             if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
-                ax_kwargs['ylabel'] = dataset
+                ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[dataset]
 
             ax.set(**ax_kwargs)
 
@@ -554,7 +581,6 @@ def main():
                 # 0.0031622776601683794,
                 0.01,
                 # 0.03162277660168379,
-                # TODO
                 0.1,
                 # 0.31622776601683794,
                 # 1.0,
@@ -609,9 +635,9 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    plot_fig_15(df)
+    # plot_fig_15(df)
     # plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
-    # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae', ))
+    plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_18(df, methods=METHODS[:3])
 
     # print_rankings(df)
