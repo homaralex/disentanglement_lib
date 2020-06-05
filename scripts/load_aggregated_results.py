@@ -328,45 +328,42 @@ def plot_fig_15(df, methods=METHODS):
 
 
 def plot_fig_16(df, methods=METHODS):
-    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(30, 12))
+    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(30, 12))
 
-    for row_idx, methods_row in enumerate(methods):
-        for col_idx, method in enumerate(methods_row):
-            ax = axes[row_idx, col_idx]
-            method_df = get_method_df(df, method)
+    for col_idx, method in enumerate(methods):
+        ax = axes[col_idx]
+        method_df = get_method_df(df, method)
 
-            corr_matrix = np.empty(shape=(len(UNSUP_METRICS), len(DIS_METRICS)), dtype=np.float)
-            for corr_col_idx, metric in enumerate(DIS_METRICS):
-                metric_df, metric_col_name = get_metric_df(method_df, metric)
+        corr_matrix = np.empty(shape=(len(DIS_METRICS), len(UNSUP_METRICS)), dtype=np.float)
+        for corr_row_idx, metric in enumerate(DIS_METRICS):
+            metric_df, metric_col_name = get_metric_df(method_df, metric)
 
-                for corr_row_idx, unsup_metric in enumerate(UNSUP_METRICS):
-                    metric_pair_df = method_df[[metric_col_name, unsup_metric]]
+            for corr_col_idx, unsup_metric in enumerate(UNSUP_METRICS):
+                metric_pair_df = method_df[[unsup_metric, metric_col_name]]
 
-                    corr = metric_pair_df.corr(method='pearson')
-                    corr_matrix[corr_row_idx, corr_col_idx] = corr.iat[0, 1]
+                corr = metric_pair_df.corr(method='pearson')
+                corr_matrix[corr_row_idx, corr_col_idx] = corr.iat[0, 1]
 
-            h = sns.heatmap(
-                data=corr_matrix,
-                annot=True,
-                cmap=sns.color_palette("coolwarm", 7),
-                cbar=False,
-                square=True,
-                xticklabels=row_idx == 1,
-                yticklabels=col_idx == 0,
-                ax=ax,
+        h = sns.heatmap(
+            data=corr_matrix,
+            annot=True,
+            cmap=sns.color_palette("coolwarm", 7),
+            cbar=False,
+            square=True,
+            yticklabels=col_idx == 0,
+            ax=ax,
+        )
+        h.set_xticklabels(
+            tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in UNSUP_METRICS),
+            rotation=90,
+        )
+        if col_idx == 0:
+            h.set_yticklabels(
+                tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in DIS_METRICS),
+                rotation=0,
             )
-            if row_idx == 1:
-                h.set_xticklabels(
-                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in DIS_METRICS),
-                    rotation=90,
-                )
-            if col_idx == 0:
-                h.set_yticklabels(
-                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in UNSUP_METRICS),
-                    rotation=0,
-                )
 
-            ax.set_title(HUMAN_READABLE_NAMES[method])
+        ax.set_title(HUMAN_READABLE_NAMES[method])
 
     plt.savefig(PLOT_DIR / 'fig_16.png')
     plt.show()
@@ -645,7 +642,7 @@ def main():
     df = df.loc[df['train_config.vae.beta'] == 16]
 
     # plot_fig_15(df)
-    plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
+    plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_18(df, methods=METHODS[:3])
 
