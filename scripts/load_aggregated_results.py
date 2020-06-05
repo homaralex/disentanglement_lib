@@ -463,10 +463,6 @@ def plot_fig_18(df, methods=METHODS):
             ax_kwargs = {}
             if row_idx == 0:
                 ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
-
-                if col_idx == len(DIS_METRICS) // 2:
-                    ax.legend()
-
             if col_idx == 0:
                 ax_kwargs['ylabel'] = 'Value'
             if row_idx == len(datasets) - 1:
@@ -476,6 +472,8 @@ def plot_fig_18(df, methods=METHODS):
                 ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[dataset]
 
             ax.set(**ax_kwargs)
+
+    axes[0, 2].legend(loc='upper center', bbox_to_anchor=(1., 1.2), ncol=len(methods) + 1)
 
     plt.savefig(PLOT_DIR / 'fig_18.png')
     plt.show()
