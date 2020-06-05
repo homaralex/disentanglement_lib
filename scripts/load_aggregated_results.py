@@ -291,17 +291,6 @@ def plot_fig_15(df, methods=METHODS):
             ax_kwargs = {}
             if row_idx == 0:
                 ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
-
-                if col_idx == len(DIS_METRICS) // 2:
-                    # display the legend (just once)
-                    # ax.legend(
-                    #     loc='upper center',
-                    #     bbox_to_anchor=(0, 1.5),
-                    #     ncol=len(METHODS) + 1,
-                    # )
-                    ax.legend()
-                    # handles, labels = ax.get_legend_handles_labels()
-
             if col_idx == 0:
                 ax_kwargs['ylabel'] = 'Value'
             if row_idx == len(DATASETS) - 1:
@@ -309,19 +298,10 @@ def plot_fig_15(df, methods=METHODS):
             if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
                 ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[dataset]
-
             ax.set(**ax_kwargs)
 
-    # fig.subplots_adjust(top=0.9, left=0.1, right=0.9,
-    #                     bottom=0.52)  # create some space below the plots by increasing the bottom-value
-    # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.52), ncol=len(METHODS) + 1)
+    axes[0, 2].legend(loc='upper center', bbox_to_anchor=(1.5, 1.2), ncol=len(methods) + 2)
 
-    # fig.subplots_adjust(top=2)
-    # fig.legend(handles, labels,
-    #               loc='upper center',
-    #               bbox_to_anchor=(0, 1.5),
-    #               # ncol=5,
-    #               )
     plt.savefig(PLOT_DIR / 'fig_15.png')
     plt.show()
     plt.close(fig)
