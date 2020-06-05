@@ -22,9 +22,9 @@ DIS_METRICS = (
     'beta_vae_sklearn',
     'factor_vae_metric',
     'evaluation_results.discrete_mig',
+    'evaluation_results.disentanglement',
     'evaluation_results.modularity_score',
     'evaluation_results.SAP_score',
-    'evaluation_results.disentanglement',
 
     # 'train_results.loss',
     # 'train_results.regularizer',
@@ -196,7 +196,7 @@ def print_rankings(df):
                 print(f'{score:.3f}: {name}')
 
 
-def plot_fig_15(df):
+def plot_fig_15(df, methods=METHODS):
     fig, axes = plt.subplots(nrows=len(DATASETS), ncols=len(DIS_METRICS), figsize=(30, 20))
 
     for row_idx, dataset in enumerate(DATASETS):
@@ -207,7 +207,7 @@ def plot_fig_15(df):
             metric_df, metric_col_name = get_metric_df(dset_df, metric)
             x_ranges = []
 
-            for method in METHODS:
+            for method in methods:
                 if 'weight_decay' in method or 'small' in method:
                     continue
 
@@ -233,6 +233,8 @@ def plot_fig_15(df):
                 y=method_df[metric_col_name].mean(),
                 ax=ax,
                 label='beta_vae',
+                zorder=10,
+                color='black',
             )
             ax.lines[-1].set_linestyle((0, (5, 5)))
             method_df = get_method_df(metric_df, 'weight_decay')
@@ -243,8 +245,9 @@ def plot_fig_15(df):
                 label='weight_decay',
                 linewidth=3,
                 color='goldenrod',
+                zorder=0,
             )
-            for perc_units, color in ((.5, 'crimson'), (.75, 'deeppink')):
+            for perc_units, color in ((.5, 'crimson'), (.75, 'violet')):
                 method_df = get_method_df(metric_df, 'small_vae')
                 method_df = method_df.loc[method_df[get_reg_col_name('small_vae')] == perc_units]
                 sns.lineplot(
@@ -254,6 +257,7 @@ def plot_fig_15(df):
                     label=f'small_vae_{perc_units}',
                     linewidth=3,
                     color=color,
+                    zorder=0,
                 )
 
             ax.get_legend().remove()
@@ -322,10 +326,10 @@ def plot_fig_16(df, methods=METHODS):
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
                 square=True,
-                xticklabels=(tuple(metric_name.replace('evaluation_results', '') for metric_name in
+                xticklabels=(tuple(metric_name.replace('evaluation_results.', '') for metric_name in
                                    DIS_METRICS) if row_idx == 1 else False),
                 yticklabels=(tuple(
-                    metric_name.replace('train_results', '') for metric_name in
+                    metric_name.replace('train_results.', '') for metric_name in
                     UNSUP_METRICS) if col_idx == 0 else False),
                 ax=ax,
             )
@@ -336,8 +340,8 @@ def plot_fig_16(df, methods=METHODS):
     plt.close(fig)
 
 
-def plot_fig_17(df):
-    methods = METHODS + ('beta_vae',)
+def plot_fig_17(df, methods=METHODS):
+    # methods = METHODS + ('beta_vae',)
     fig, axes = plt.subplots(nrows=len(methods), ncols=len(DIS_METRICS), figsize=(30, 20))
 
     for row_idx, method in enumerate(methods):
@@ -349,7 +353,7 @@ def plot_fig_17(df):
             metric_df, metric_col_name = get_metric_df(method_df, metric)
 
             if 'beta_vae' in method:
-                shapes3d_df = pd.concat([get_dataset_df(metric_df, 'shapes3d')] * 8).head(50)
+                shapes3d_df = pd.concat([get_dataset_df(metric_df, 'shapes3d')]).head(50)
                 metric_df = pd.concat([metric_df.loc[metric_df[DATASET_COL_STR] != 'shapes3d'], shapes3d_df])
                 grouped_df = metric_df
                 grouped_df = pd.DataFrame(
@@ -412,19 +416,21 @@ def plot_fig_17(df):
     plt.close(fig)
 
 
-def plot_fig_18(df):
+def plot_fig_18(df, methods=METHODS):
     datasets = DATASETS[1:]
+    # datasets = (DATASETS[0], ) + DATASETS[2:]
     fig, axes = plt.subplots(nrows=len(datasets), ncols=len(DIS_METRICS), figsize=(30, 20))
 
     for col_idx, metric in enumerate(DIS_METRICS):
         metric_df, metric_col_name = get_metric_df(df, metric)
         dsprites_df = get_dataset_df(metric_df, 'dsprites_full')
+        # dsprites_df = get_dataset_df(metric_df, 'scream_dsprites')
 
         for row_idx, dataset in enumerate(datasets):
             ax = axes[row_idx, col_idx]
             dataset_df = get_dataset_df(metric_df, dataset)
 
-            for method in METHODS:
+            for method in methods:
                 reg_col_name = get_reg_col_name(method)
                 method_df = get_method_df(dataset_df, method).groupby(reg_col_name)[metric_col_name].mean()
                 dsprites_method_df = get_method_df(dsprites_df, method).groupby(reg_col_name)[metric_col_name].mean()
@@ -433,7 +439,7 @@ def plot_fig_18(df):
                     x=dsprites_method_df.values,
                     y=method_df.values,
                     label=method,
-                    s=128,
+                    s=256,
                     marker=('o' if 'col' in method else ('^' if 'l1' in method else 's')),
                     ax=ax,
                 )
@@ -603,10 +609,10 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    # plot_fig_15(df)
-    plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
-    # plot_fig_17(df)
-    # plot_fig_18(df)
+    plot_fig_15(df)
+    # plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
+    # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae', ))
+    # plot_fig_18(df, methods=METHODS[:3])
 
     # print_rankings(df)
 
