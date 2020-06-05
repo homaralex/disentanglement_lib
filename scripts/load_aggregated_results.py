@@ -248,7 +248,7 @@ def plot_fig_15(df, methods=METHODS):
                     x=(0, 5) if 'small' in method else x_range,
                     y=(grouped_df.iloc[::-1] if 'small' in method else grouped_df).values,
                     ax=ax,
-                    label=method,
+                    label=HUMAN_READABLE_NAMES[method],
                     linewidth=4,
                 )
 
@@ -472,7 +472,7 @@ def plot_fig_18(df, methods=METHODS):
                 sns.scatterplot(
                     x=dsprites_method_df.values,
                     y=method_df.values,
-                    label=method,
+                    label=HUMAN_READABLE_NAMES[method],
                     s=256,
                     marker=('o' if 'col' in method else ('^' if 'l1' in method else 's')),
                     ax=ax,
@@ -641,10 +641,10 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    # plot_fig_15(df)
+    plot_fig_15(df)
     plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
-    # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
-    # plot_fig_18(df, methods=METHODS[:3])
+    plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
+    plot_fig_18(df, methods=METHODS[:3])
 
     # print_rankings(df)
 
