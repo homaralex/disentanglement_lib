@@ -345,18 +345,27 @@ def plot_fig_16(df, methods=METHODS):
                     corr = metric_pair_df.corr(method='pearson')
                     corr_matrix[corr_row_idx, corr_col_idx] = corr.iat[0, 1]
 
-            sns.heatmap(
+            h = sns.heatmap(
                 data=corr_matrix,
                 annot=True,
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
                 square=True,
-                xticklabels=(
-                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in DIS_METRICS) if row_idx == 1 else False),
-                yticklabels=(tuple(
-                    HUMAN_READABLE_NAMES[metric_name] for metric_name in UNSUP_METRICS) if col_idx == 0 else False),
+                xticklabels=row_idx == 1,
+                yticklabels=col_idx == 0,
                 ax=ax,
             )
+            if row_idx == 1:
+                h.set_xticklabels(
+                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in DIS_METRICS),
+                    rotation=90,
+                )
+            if col_idx == 0:
+                h.set_yticklabels(
+                    tuple(HUMAN_READABLE_NAMES[metric_name] for metric_name in UNSUP_METRICS),
+                    rotation=0,
+                )
+
             ax.set_title(HUMAN_READABLE_NAMES[method])
 
     plt.savefig(PLOT_DIR / 'fig_16.png')
@@ -636,8 +645,8 @@ def main():
     df = df.loc[df['train_config.vae.beta'] == 16]
 
     # plot_fig_15(df)
-    # plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
-    plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
+    plot_fig_16(df, methods=(METHODS[:3], METHODS[3:] + ('beta_vae',)))
+    # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_18(df, methods=METHODS[:3])
 
     # print_rankings(df)
