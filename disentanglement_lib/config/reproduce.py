@@ -125,8 +125,8 @@ _mask_l1_studies_7 = {
     for s in _sweep_dim_wise
 }
 
-_mask_l1_paper_studies = {
-    f"{s['dataset']}_mask_7_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
+_mask_l1_studies_paper = {
+    f"{s['dataset']}_mask_paper_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
         lmbd_l1_range=np.logspace(-1, -6, 6),
         **s)
     for s in _sweep_dim_wise
@@ -180,6 +180,7 @@ STUDIES = {
     **_mask_l1_studies_4,
     **_mask_l1_studies_5,
     **_mask_l1_studies_7,
+    **_mask_l1_studies_paper,
     **_weight_decay_studies,
     **_masked_studies,
     **_baseline_studies,
