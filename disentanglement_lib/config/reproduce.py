@@ -84,7 +84,7 @@ _dim_wise_mask_studies_6 = {
 }
 _dim_wise_mask_studies_7 = {
     f"{s['dataset']}_dim_wise_mask_7_l1_{s['dim']}_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.DimWiseMaskL1Study(
-        lmbd_l1_range=(.1, ),
+        lmbd_l1_range=(.1,),
         **s)
     for s in _sweep_dim_wise
 }
@@ -120,7 +120,14 @@ _mask_l1_studies_5 = {
 }
 _mask_l1_studies_7 = {
     f"{s['dataset']}_mask_7_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
-        lmbd_l1_range=(.1, ),
+        lmbd_l1_range=(.1,),
+        **s)
+    for s in _sweep_dim_wise
+}
+
+_mask_l1_paper_studies = {
+    f"{s['dataset']}_mask_7_l1_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_per_layer'] else ''}b_{s['beta']}": sparsity_study.MaskL1Study(
+        lmbd_l1_range=np.logspace(-1, -6, 6),
         **s)
     for s in _sweep_dim_wise
 }
