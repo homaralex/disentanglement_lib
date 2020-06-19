@@ -52,6 +52,7 @@ class BaseSparsityStudy(study.Study):
     def skip_study(self, model_num):
         return False
 
+
 class BaselineSparsityStudy(BaseSparsityStudy):
     def get_default_models(self):
         # Baseline beta VAE
@@ -74,7 +75,7 @@ class SmallVAEStudy(BaseSparsityStudy):
         model_name = h.fixed("model.name", "small_vae")
         model_fn = h.fixed("model.model", "@vae()")
         beta = h.fixed('vae.beta', self.beta)
-        perc_filters = h.sweep("conv_encoder.perc_units", h.discrete([.5, .75]))
+        perc_filters = h.sweep("conv_encoder.perc_units", h.discrete(1 - np.linspace(.1, 1, 6, endpoint=False)))
         config_vae = h.zipit([
             model_name,
             beta,

@@ -230,9 +230,10 @@ def conv_encoder(
         name="e4",
     )
     flat_e4 = tf.layers.flatten(e4)
-    e5 = dense(flat_e4, int(256 * perc_units), activation=tf.nn.relu, name="e5")
+    e5 = dense(flat_e4, 256, activation=tf.nn.relu, name="e5")
     means = dense(e5, num_latent, activation=None, name="means")
     log_var = dense(e5, num_latent, activation=None, name="log_var")
+
     return means, log_var
 
 
