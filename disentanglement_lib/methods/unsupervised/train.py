@@ -143,6 +143,8 @@ def train(model_dir,
   results_dict["elapsed_time"] = time.time() - experiment_timer
   results.update_result_directory(results_dir, "train", results_dict)
 
+  del dataset
+
 
 def _make_input_fn(ground_truth_data, seed, num_batches=None):
   """Creates an input function for the experiments."""

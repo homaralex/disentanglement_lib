@@ -145,6 +145,12 @@ _masked_studies = {
     for s in _sweep_masked
 }
 
+_sweep_proximal = h.product((_betas, _datasets, _all_layers))
+_proximal_studies = {
+    f"{s['dataset']}_proximal_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.ProximalStudy(**s)
+    for s in _sweep_proximal
+}
+
 _sweep_small = h.product((_betas, _datasets))
 _small_studies = {
     f"{s['dataset']}_small_vae_b_{s['beta']}": sparsity_study.SmallVAEStudy(**s)
@@ -165,7 +171,6 @@ STUDIES = {
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
     'wae': sparsity_study.WAEStudy(dataset='dsprites_full'),
-    **_small_studies,
     **_dim_wise_studies,
     **_dim_wise_mask_studies,
     **_dim_wise_mask_studies_2,
@@ -180,8 +185,11 @@ STUDIES = {
     **_mask_l1_studies_4,
     **_mask_l1_studies_5,
     **_mask_l1_studies_7,
+
     **_mask_l1_studies_paper,
-    **_weight_decay_studies,
     **_masked_studies,
+    **_proximal_studies,
+    **_weight_decay_studies,
+    **_small_studies,
     **_baseline_studies,
 }

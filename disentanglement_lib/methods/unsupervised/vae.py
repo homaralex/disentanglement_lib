@@ -35,6 +35,10 @@ import gin.tf
 class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     """Abstract base class of a basic Gaussian encoder model."""
 
+    @property
+    def additional_ops(self):
+        return []
+
     def model_fn(self, features, labels, mode, params):
         """TPUEstimator compatible model function."""
         del labels
@@ -51,10 +55,11 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         elbo = tf.add(reconstruction_loss, kl_loss, name="elbo")
         if mode == tf.estimator.ModeKeys.TRAIN:
             optimizer = optimizers.make_vae_optimizer()
+            self._optimizer = optimizer
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             train_op = optimizer.minimize(
                 loss=loss, global_step=tf.train.get_global_step())
-            train_op = tf.group([train_op, update_ops])
+            train_op = tf.group([train_op, update_ops, *self.additional_ops])
             tf.summary.scalar("reconstruction_loss", reconstruction_loss)
             tf.summary.scalar("elbo", -elbo)
 
@@ -447,8 +452,18 @@ def col_l1(weight, axis, scale):
     return tf.reduce_sum(tf.abs(weight), axis=axis) * scale_factor
 
 
+class PenalizeWeightsMixin:
+    def get_weights_to_penalize(self):
+        return (w for w in tf.trainable_variables() if
+                (
+                        (any(name in w.name for name in
+                             (f'e{idx}/kernel:0' for idx in range(2, 6))) and self.all_layers) or
+                        'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
+                ))
+
+
 @gin.configurable('dim_wise_l1_vae')
-class DimWiseL1VAE(BetaVAE):
+class DimWiseL1VAE(BetaVAE, PenalizeWeightsMixin):
     def __init__(
             self,
             lmbd_l1=gin.REQUIRED,
@@ -473,14 +488,6 @@ class DimWiseL1VAE(BetaVAE):
             return 1
         else:
             return None
-
-    def get_weights_to_penalize(self):
-        return (w for w in tf.trainable_variables() if
-                (
-                        (any(name in w.name for name in
-                             (f'e{idx}/kernel:0' for idx in range(2, 6))) and self.all_layers) or
-                        'means/kernel:0' in w.name or 'log_var/kernel:0' in w.name
-                ))
 
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         kld = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
@@ -509,6 +516,45 @@ class DimWiseMaskL1VAE(DimWiseL1VAE):
         l2_penalty = sum(tf.norm(w, ord=2) for w in super().get_weights_to_penalize())
 
         return reg_loss + l2_penalty * self.lmbd_l2
+
+
+# TODO masked proximal
+@gin.configurable('proximal_vae')
+class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
+    def __init__(self, lmbd_prox, all_layers, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.lmbd_prox = lmbd_prox
+        self.all_layers = all_layers
+
+    @property
+    def additional_ops(self):
+        assert self._optimizer
+        # init proximal gradient operations
+        min_val = self._optimizer._lr * self.lmbd_prox
+
+        self.proximal_ops = []
+        for weight_tensor in self.get_weights_to_penalize():
+            is_matrix = len(weight_tensor.shape) <= 2
+
+            norms = tf.norm(
+                weight_tensor if is_matrix else tf.reshape(weight_tensor, (weight_tensor.shape[2], -1)),
+                ord=2,
+                axis=1,
+                keepdims=True,
+            )
+            # clip norms to epsilon to prevent zero division
+            eps_norms = tf.clip_by_value(t=norms, clip_value_min=1e-16, clip_value_max=tf.float32.max)
+            eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1, ) + tuple(eps_norms.shape))
+
+            new_weights = (weight_tensor / eps_norms) * tf.clip_by_value(
+                t=(norms - min_val),
+                clip_value_min=0,
+                clip_value_max=tf.float32.max,
+            )
+            self.proximal_ops.append(weight_tensor.assign(new_weights))
+
+        return self.proximal_ops
 
 
 @gin.configurable('wae')

@@ -249,6 +249,38 @@ class MaskL1Study(DimWiseMaskL1Study):
         self.dim = None
 
 
+class ProximalStudy(BaseSparsityStudy):
+    def __init__(
+            self,
+            lmbd_prox_range=np.logspace(2, -3, 6),
+            all_layers=True,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.lmbd_prox_range = lmbd_prox_range
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "proximal_vae")
+        model_fn = h.fixed("model.model", "@proximal_vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        all_layers = h.fixed('proximal_vae.all_layers', self.all_layers)
+        lmbds_prox = h.sweep("proximal_vae.lmbd_prox", h.discrete(self.lmbd_prox_range))
+        config_proximal = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            all_layers,
+            lmbds_prox,
+        ])
+
+        all_models = h.chainit([config_proximal, ])
+
+        return all_models
+
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, *args, **kwargs):
         # add a placeholder for beta
