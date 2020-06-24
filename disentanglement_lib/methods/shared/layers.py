@@ -12,6 +12,8 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import standard_ops
 
+_EPS = 1e-8
+
 
 @gin.configurable('masked_layer', whitelist=['mask_trainable'])
 class _BaseMaskedLayer:
@@ -34,6 +36,51 @@ class _BaseMaskedLayer:
             trainable=self.mask_trainable,
             dtype=self.dtype,
         )
+
+    def build(self, input_shape):
+        super().build(input_shape)
+        self.built = False
+        self._init_mask()
+        self.built = True
+
+
+class _BaseVariationalMask:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def mask_shape(self):
+        return self.kernel.shape[-2:]
+
+    def _init_mask(self):
+        # TODO init val
+        mu_val = np.ones(self.mask_shape)
+        self.mu = self.add_weight(
+            name='vdm_mu',
+            shape=self.mask_shape,
+            initializer=init_ops.Constant(mu_val),
+            trainable=True,
+            dtype=self.dtype,
+        )
+
+        self.log_sigma_2 = self.add_weight(
+            name='vdm_log_sigma_2',
+            shape=self.mask_shape,
+            initializer=init_ops.Constant(-10.),
+            trainable=True,
+            dtype=self.dtype,
+        )
+
+    def get_log_alpha(self):
+        log_alpha = tf.clip_by_value(self.log_sigma_2 - tf.log(tf.square(self.mu) + _EPS), -8., 8.)
+        return tf.identity(log_alpha, name='log_alpha')
+
+    def apply_mask(self, inp):
+        mu = inp * self.mu
+        std = tf.sqrt(tf.square(inp) * tf.exp(self.get_log_alpha()) * tf.square(self.mu) + _EPS)
+        outp = mu + std * tf.random_normal(self.mask_shape)
+
+        return outp
 
     def build(self, input_shape):
         super().build(input_shape)
@@ -123,7 +170,8 @@ class MaskedDense(_BaseMaskedLayer, Dense):
                 inputs,
                 # that's the actual change
                 self.kernel * self.mask,
-                [[rank - 1], [0]])
+                [[rank - 1], [0]]
+            )
             # Reshape the output back to the original ndim of the input.
             if not context.executing_eagerly():
                 shape = inputs.shape.as_list()
@@ -138,7 +186,7 @@ class MaskedDense(_BaseMaskedLayer, Dense):
             outputs = gen_math_ops.mat_mul(
                 inputs,
                 # that's the actual change
-                self.kernel * self.mask
+                self.kernel * self.mask,
             )
         if self.use_bias:
             outputs = nn.bias_add(outputs, self.bias)

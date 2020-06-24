@@ -281,6 +281,11 @@ class ProximalStudy(BaseSparsityStudy):
         return all_models
 
 
+class VariationalDropoutStudy(BaseSparsityStudy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, *args, **kwargs):
         # add a placeholder for beta

@@ -151,6 +151,12 @@ _proximal_studies = {
     for s in _sweep_proximal
 }
 
+_sweep_variational = h.product((_betas, _datasets, _all_layers))
+_variational_studies = {
+    f"{s['dataset']}_variational_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.VariationalDropoutStudy(**s)
+    for s in _sweep_variational
+}
+
 _sweep_small = h.product((_betas, _datasets))
 _small_studies = {
     f"{s['dataset']}_small_vae_b_{s['beta']}": sparsity_study.SmallVAEStudy(**s)
@@ -189,6 +195,7 @@ STUDIES = {
     **_mask_l1_studies_paper,
     **_masked_studies,
     **_proximal_studies,
+    **_variational_studies,
     **_weight_decay_studies,
     **_small_studies,
     **_baseline_studies,
