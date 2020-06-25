@@ -44,51 +44,6 @@ class _BaseMaskedLayer:
         self.built = True
 
 
-class _BaseVariationalMask:
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @property
-    def mask_shape(self):
-        return self.kernel.shape[-2:]
-
-    def _init_mask(self):
-        # TODO init val
-        mu_val = np.ones(self.mask_shape)
-        self.mu = self.add_weight(
-            name='vdm_mu',
-            shape=self.mask_shape,
-            initializer=init_ops.Constant(mu_val),
-            trainable=True,
-            dtype=self.dtype,
-        )
-
-        self.log_sigma_2 = self.add_weight(
-            name='vdm_log_sigma_2',
-            shape=self.mask_shape,
-            initializer=init_ops.Constant(-10.),
-            trainable=True,
-            dtype=self.dtype,
-        )
-
-    def get_log_alpha(self):
-        log_alpha = tf.clip_by_value(self.log_sigma_2 - tf.log(tf.square(self.mu) + _EPS), -8., 8.)
-        return tf.identity(log_alpha, name='log_alpha')
-
-    def apply_mask(self, inp):
-        mu = inp * self.mu
-        std = tf.sqrt(tf.square(inp) * tf.exp(self.get_log_alpha()) * tf.square(self.mu) + _EPS)
-        outp = mu + std * tf.random_normal(self.mask_shape)
-
-        return outp
-
-    def build(self, input_shape):
-        super().build(input_shape)
-        self.built = False
-        self._init_mask()
-        self.built = True
-
-
 class MaskedConv2d(_BaseMaskedLayer, tf.layers.Conv2D):
     def call(self, inputs):
         outputs = self._convolution_op(
@@ -227,5 +182,102 @@ def masked_dense(
         _scope=name,
         _reuse=reuse,
         perc_sparse=perc_sparse,
+    )
+    return layer.apply(inputs)
+
+
+# TODO other parameterization version
+class VDMaskedConv2D(tf.layers.Conv2D):
+    @property
+    def mask_shape(self):
+        return self.kernel.shape[-2:]
+
+    def _build(self):
+        self.log_sigma_2 = self.add_weight(
+            name='vdm_log_sigma_2',
+            shape=self.mask_shape,
+            initializer=init_ops.Constant(-10.),
+            trainable=True,
+            dtype=self.dtype,
+        )
+
+    def build(self, input_shape):
+        super().build(input_shape)
+        self.built = False
+        self._build()
+        self.built = True
+
+    def get_log_alpha(self):
+        log_alpha = tf.clip_by_value(self.log_sigma_2 - tf.log(tf.square(self.kernel) + _EPS), -8., 8.)
+        return tf.identity(log_alpha, name='log_alpha')
+
+    def call(self, inputs):
+        mu = self._convolution_op(inputs, self.kernel)
+        std = tf.sqrt(
+            self._convolution_op(
+                tf.square(inputs),
+                tf.exp(self.get_log_alpha()) * tf.square(self.kernel),
+            ) + _EPS,
+        )
+        # TODO phase cond statement
+        outputs = mu + std * tf.random_normal(tf.shape(std))
+
+        if self.use_bias:
+            if self.data_format == 'channels_first':
+                if self.rank == 1:
+                    # nn.bias_add does not accept a 1D input tensor.
+                    bias = array_ops.reshape(self.bias, (1, self.filters, 1))
+                    outputs += bias
+                else:
+                    outputs = nn.bias_add(outputs, self.bias, data_format='NCHW')
+            else:
+                outputs = nn.bias_add(outputs, self.bias, data_format='NHWC')
+
+        if self.activation is not None:
+            return self.activation(outputs)
+        return outputs
+
+
+def vd_conv2d(
+        inputs,
+        filters,
+        kernel_size,
+        strides=(1, 1),
+        padding='valid',
+        data_format='channels_last',
+        dilation_rate=(1, 1),
+        activation=None,
+        use_bias=True,
+        kernel_initializer=None,
+        bias_initializer=init_ops.zeros_initializer(),
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        activity_regularizer=None,
+        kernel_constraint=None,
+        bias_constraint=None,
+        trainable=True,
+        name=None,
+        reuse=None,
+):
+    layer = VDMaskedConv2D(
+        filters=filters,
+        kernel_size=kernel_size,
+        strides=strides,
+        padding=padding,
+        data_format=data_format,
+        dilation_rate=dilation_rate,
+        activation=activation,
+        use_bias=use_bias,
+        kernel_initializer=kernel_initializer,
+        bias_initializer=bias_initializer,
+        kernel_regularizer=kernel_regularizer,
+        bias_regularizer=bias_regularizer,
+        activity_regularizer=activity_regularizer,
+        kernel_constraint=kernel_constraint,
+        bias_constraint=bias_constraint,
+        trainable=trainable,
+        name=name,
+        _reuse=reuse,
+        _scope=name,
     )
     return layer.apply(inputs)

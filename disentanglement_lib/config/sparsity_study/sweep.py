@@ -281,9 +281,38 @@ class ProximalStudy(BaseSparsityStudy):
         return all_models
 
 
-class VariationalDropoutStudy(BaseSparsityStudy):
-    def __init__(self, *args, **kwargs):
+class VDMaskedStudy(BaseSparsityStudy):
+    def __init__(
+            self,
+            all_layers=True,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "vdm_vae")
+        model_fn = h.fixed("model.model", "@vdm_vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
+        vd_layers = h.fixed('conv_encoder.vd_layers', True)
+
+        # TODO lmbd_kld_vd
+        lmbd_kld_vd = h.sweep("vdm_vae.lmbd_kld_vd", h.discrete([*np.logspace(-3, 3, 6, endpoint=False)]))
+        config_vdm = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            all_layers,
+            vd_layers,
+            lmbd_kld_vd,
+        ])
+
+        all_models = h.chainit([config_vdm, ])
+
+        return all_models
 
 
 class WAEStudy(BaseSparsityStudy):

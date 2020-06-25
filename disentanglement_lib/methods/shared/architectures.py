@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 import gin.tf
 
-from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense
+from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -143,13 +143,14 @@ def fc_encoder(input_tensor, num_latent, is_training=True):
     return means, log_var
 
 
-@gin.configurable("conv_encoder", whitelist=['perc_sparse', 'all_layers', 'perc_units'])
+@gin.configurable("conv_encoder", blacklist=['input_tensor', 'num_latent', 'is_training'])
 def conv_encoder(
         input_tensor,
         num_latent,
         perc_sparse=None,
         all_layers=True,
         perc_units=1.,
+        vd_layers=False,
         is_training=True,
 ):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
@@ -175,14 +176,18 @@ def conv_encoder(
     use_masked = perc_sparse is not None
 
     def conv2d(*args, **kwargs):
-        if use_masked and all_layers:
-            conv_fn = masked_conv2d
-            kwargs['perc_sparse'] = perc_sparse
-        else:
-            conv_fn = tf.layers.conv2d
+        conv_fn = tf.layers.conv2d
+
+        if all_layers:
+            if use_masked:
+                conv_fn = masked_conv2d
+                kwargs['perc_sparse'] = perc_sparse
+            elif vd_layers:
+                conv_fn = vd_conv2d
 
         return conv_fn(*args, **kwargs)
 
+    # TODO vd_dense
     def dense(*args, **kwargs):
         if use_masked and (all_layers or kwargs['name'] in ('means', 'log_var')):
             dense_fn = masked_dense

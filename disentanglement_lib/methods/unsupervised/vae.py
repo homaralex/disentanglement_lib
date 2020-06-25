@@ -545,7 +545,7 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
             )
             # clip norms to epsilon to prevent zero division
             eps_norms = tf.clip_by_value(t=norms, clip_value_min=1e-16, clip_value_max=tf.float32.max)
-            eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1, ) + tuple(eps_norms.shape))
+            eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1,) + tuple(eps_norms.shape))
 
             new_weights = (weight_tensor / eps_norms) * tf.clip_by_value(
                 t=(norms - min_val),
@@ -555,6 +555,34 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
             self.proximal_ops.append(weight_tensor.assign(new_weights))
 
         return self.proximal_ops
+
+
+@gin.configurable('vdm_vae')
+class VDMaskedVAE(BetaVAE):
+    def __init__(self, lmbd_kld_vd, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lmbd_kld_vd = lmbd_kld_vd
+
+    def get_weights_to_penalize(self):
+        graph = tf.get_default_graph()
+        node_defs = [n for n in graph.as_graph_def().node if 'log_alpha' in n.name]
+        tensors = (graph.get_tensor_by_name(n.name + ":0") for n in node_defs)
+
+        return tensors
+
+    def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
+        kld_reprs = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
+
+        k1, k2, k3 = 0.63576, 1.8732, 1.48695
+        C = -k1
+        kld_vd = sum(
+            tf.reduce_sum(
+                k1 * tf.nn.sigmoid(k2 + k3 * log_alpha) - 0.5 * tf.log1p(tf.exp(-log_alpha)) + C
+            )
+            for log_alpha in self.get_weights_to_penalize()
+        ) / tf.cast(z_mean.shape[0], tf.float32)  # TODO check if that scaling is correct
+
+        return kld_reprs + self.lmbd_kld_vd * kld_vd
 
 
 @gin.configurable('wae')
