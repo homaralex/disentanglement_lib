@@ -35,8 +35,7 @@ import gin.tf
 class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     """Abstract base class of a basic Gaussian encoder model."""
 
-    @property
-    def additional_ops(self):
+    def get_additional_ops(self):
         return []
 
     def get_additional_logging(self):
@@ -64,7 +63,7 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             train_op = optimizer.minimize(
                 loss=loss, global_step=tf.train.get_global_step())
-            train_op = tf.group([train_op, update_ops, *self.additional_ops])
+            train_op = tf.group([train_op, update_ops, *self.get_additional_ops()])
 
             tf.summary.scalar("reconstruction_loss", reconstruction_loss)
             tf.summary.scalar("elbo", -elbo)
@@ -537,9 +536,7 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
         self.lmbd_prox = lmbd_prox
         self.all_layers = all_layers
 
-    # TODO this should be a method (get_addtl_ops) and not a property
-    @property
-    def additional_ops(self):
+    def get_additional_ops(self):
         assert self._optimizer
         # init proximal gradient operations
         min_val = self._optimizer._lr * self.lmbd_prox
