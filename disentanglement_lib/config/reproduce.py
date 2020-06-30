@@ -153,7 +153,7 @@ _proximal_studies = {
 
 _sweep_variational = h.product((_betas, _datasets, _all_layers))
 _variational_studies = {
-    f"{s['dataset']}_vdmasked_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.VDMaskedStudy(**s)
+    f"{s['dataset']}_vd_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.VDMaskedStudy(**s)
     for s in _sweep_variational
 }
 

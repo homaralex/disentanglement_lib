@@ -188,6 +188,18 @@ def masked_dense(
 
 # TODO other parameterization version
 class VDMaskedConv2D(tf.layers.Conv2D):
+    def __init__(
+            self,
+            training_phase,
+            thresh=3,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.training_phase = training_phase
+        self.thresh = thresh
+
     @property
     def mask_shape(self):
         return self.kernel.shape[-2:]
@@ -211,16 +223,35 @@ class VDMaskedConv2D(tf.layers.Conv2D):
         log_alpha = tf.clip_by_value(self.log_sigma_2 - tf.log(tf.square(self.kernel) + _EPS), -8., 8.)
         return tf.identity(log_alpha, name='log_alpha')
 
+    @property
+    def vd_threshold(self):
+        return gin.query_parameter('vd_vae.vd_threshold')
+
     def call(self, inputs):
-        mu = self._convolution_op(inputs, self.kernel)
-        std = tf.sqrt(
-            self._convolution_op(
-                tf.square(inputs),
-                tf.exp(self.get_log_alpha()) * tf.square(self.kernel),
-            ) + _EPS,
-        )
-        # TODO phase cond statement
-        outputs = mu + std * tf.random_normal(tf.shape(std))
+        log_alpha = self.get_log_alpha()
+
+        if self.training_phase:
+            mu = self._convolution_op(inputs, self.kernel)
+            std = tf.sqrt(
+                self._convolution_op(
+                    tf.square(inputs),
+                    tf.exp(log_alpha) * tf.square(self.kernel),
+                ) + _EPS,
+            )
+            noisy_out = mu + std * tf.random_normal(tf.shape(std))
+
+            outputs = noisy_out
+        else:
+            select_mask = tf.cast(tf.less(log_alpha, self.vd_threshold), tf.float32)
+            masked_out = self._convolution_op(inputs, self.kernel * select_mask)
+
+            outputs = masked_out
+
+        # outputs = tf.cond(
+        #     self.training_phase,
+        #     lambda: noisy_out,
+        #     lambda: masked_out,
+        # )
 
         if self.use_bias:
             if self.data_format == 'channels_first':
@@ -242,6 +273,7 @@ def vd_conv2d(
         inputs,
         filters,
         kernel_size,
+        training_phase,
         strides=(1, 1),
         padding='valid',
         data_format='channels_last',
@@ -279,5 +311,6 @@ def vd_conv2d(
         name=name,
         _reuse=reuse,
         _scope=name,
+        training_phase=training_phase,
     )
     return layer.apply(inputs)

@@ -171,7 +171,6 @@ def conv_encoder(
       log_var: Output tensor of shape (batch_size, num_latent) with latent
         variable log variances.
     """
-    del is_training
 
     use_masked = perc_sparse is not None
 
@@ -183,6 +182,7 @@ def conv_encoder(
                 conv_fn = masked_conv2d
                 kwargs['perc_sparse'] = perc_sparse
             elif vd_layers:
+                kwargs['training_phase'] = is_training
                 conv_fn = vd_conv2d
 
         return conv_fn(*args, **kwargs)

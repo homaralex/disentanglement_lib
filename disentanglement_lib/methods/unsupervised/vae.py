@@ -39,6 +39,9 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     def additional_ops(self):
         return []
 
+    def get_additional_logging(self):
+        return {}
+
     def model_fn(self, features, labels, mode, params):
         """TPUEstimator compatible model function."""
         del labels
@@ -53,6 +56,8 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
         loss = tf.add(reconstruction_loss, regularizer, name="loss")
         elbo = tf.add(reconstruction_loss, kl_loss, name="elbo")
+        additional_logging = self.get_additional_logging()
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             optimizer = optimizers.make_vae_optimizer()
             self._optimizer = optimizer
@@ -60,13 +65,18 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
             train_op = optimizer.minimize(
                 loss=loss, global_step=tf.train.get_global_step())
             train_op = tf.group([train_op, update_ops, *self.additional_ops])
+
             tf.summary.scalar("reconstruction_loss", reconstruction_loss)
             tf.summary.scalar("elbo", -elbo)
+
+            for log_name, log_val in additional_logging.items():
+                tf.summary.scalar(log_name, log_val)
 
             logging_hook = tf.train.LoggingTensorHook({
                 "loss": loss,
                 "reconstruction_loss": reconstruction_loss,
-                "elbo": -elbo
+                "elbo": -elbo,
+                **additional_logging,
             },
                 every_n_iter=100)
             return tf.contrib.tpu.TPUEstimatorSpec(
@@ -79,8 +89,8 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
                 mode=mode,
                 loss=loss,
                 eval_metrics=(make_metric_fn("reconstruction_loss", "elbo",
-                                             "regularizer", "kl_loss"),
-                              [reconstruction_loss, -elbo, regularizer, kl_loss]))
+                                             "regularizer", "kl_loss", *additional_logging.keys()),
+                              [reconstruction_loss, -elbo, regularizer, kl_loss, *additional_logging.values()]))
         else:
             raise NotImplementedError("Eval mode not supported.")
 
@@ -527,6 +537,7 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
         self.lmbd_prox = lmbd_prox
         self.all_layers = all_layers
 
+    # TODO this should be a method (get_addtl_ops) and not a property
     @property
     def additional_ops(self):
         assert self._optimizer
@@ -557,11 +568,13 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
         return self.proximal_ops
 
 
-@gin.configurable('vdm_vae')
-class VDMaskedVAE(BetaVAE):
-    def __init__(self, lmbd_kld_vd, *args, **kwargs):
+@gin.configurable('vd_vae')
+class VDVAE(BetaVAE):
+    def __init__(self, lmbd_kld_vd, vd_threshold=3., *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.lmbd_kld_vd = lmbd_kld_vd
+        self.vd_threshold = vd_threshold
 
     def get_weights_to_penalize(self):
         graph = tf.get_default_graph()
@@ -583,6 +596,20 @@ class VDMaskedVAE(BetaVAE):
         ) / tf.cast(z_mean.shape[0], tf.float32)  # TODO check if that scaling is correct
 
         return kld_reprs + self.lmbd_kld_vd * kld_vd
+
+    def get_additional_logging(self):
+        log_alphas = self.get_weights_to_penalize()
+
+        N_active, N_total = 0., 0.
+        for la in log_alphas:
+            m = tf.cast(tf.less(la, self.vd_threshold), tf.float32)
+            n_active = tf.reduce_sum(m)
+            n_total = tf.cast(tf.reduce_prod(tf.shape(m)), tf.float32)
+            N_active += n_active
+            N_total += n_total
+        sparsity = 1.0 - N_active / N_total
+
+        return {'sparsity': sparsity}
 
 
 @gin.configurable('wae')

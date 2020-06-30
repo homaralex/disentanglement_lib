@@ -293,20 +293,22 @@ class VDMaskedStudy(BaseSparsityStudy):
         self.all_layers = all_layers
 
     def get_default_models(self):
-        model_name = h.fixed("model.name", "vdm_vae")
-        model_fn = h.fixed("model.model", "@vdm_vae()")
+        model_name = h.fixed("model.name", "vd_vae")
+        model_fn = h.fixed("model.model", "@vd_vae()")
         beta = h.fixed('vae.beta', self.beta)
         all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
         vd_layers = h.fixed('conv_encoder.vd_layers', True)
+        vd_threshold = h.fixed('vd_vae.vd_threshold', 3.)
 
         # TODO lmbd_kld_vd
-        lmbd_kld_vd = h.sweep("vdm_vae.lmbd_kld_vd", h.discrete([*np.logspace(-3, 3, 6, endpoint=False)]))
+        lmbd_kld_vd = h.sweep("vd_vae.lmbd_kld_vd", h.discrete([*np.logspace(-3, 3, 6, endpoint=False)]))
         config_vdm = h.zipit([
             model_name,
             model_fn,
             beta,
             all_layers,
             vd_layers,
+            vd_threshold,
             lmbd_kld_vd,
         ])
 
