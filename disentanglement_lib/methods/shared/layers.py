@@ -191,14 +191,12 @@ class VDMaskedConv2D(tf.layers.Conv2D):
     def __init__(
             self,
             training_phase,
-            thresh=3,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
         self.training_phase = training_phase
-        self.thresh = thresh
 
     @property
     def mask_shape(self):
@@ -246,12 +244,6 @@ class VDMaskedConv2D(tf.layers.Conv2D):
             masked_out = self._convolution_op(inputs, self.kernel * select_mask)
 
             outputs = masked_out
-
-        # outputs = tf.cond(
-        #     self.training_phase,
-        #     lambda: noisy_out,
-        #     lambda: masked_out,
-        # )
 
         if self.use_bias:
             if self.data_format == 'channels_first':
