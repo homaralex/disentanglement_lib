@@ -567,10 +567,20 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
 
 @gin.configurable('vd_vae')
 class VDVAE(BetaVAE):
-    def __init__(self, lmbd_kld_vd, vd_threshold=3., *args, **kwargs):
+    def __init__(
+            self,
+            lmbd_kld_vd,
+            anneal_kld_from=0,
+            anneal_kld_for=None,
+            vd_threshold=3.,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
 
-        self.lmbd_kld_vd = lmbd_kld_vd
+        self._lmbd_kld_vd = lmbd_kld_vd
+        self.anneal_kld_from = anneal_kld_from
+        self.anneal_kld_for = anneal_kld_for
         self.vd_threshold = vd_threshold
 
     def get_weights_to_penalize(self):
@@ -579,6 +589,16 @@ class VDVAE(BetaVAE):
         tensors = (graph.get_tensor_by_name(n.name + ":0") for n in node_defs)
 
         return tensors
+
+    @property
+    def lmbd_kld_vd(self):
+        if self.anneal_kld_for is None:
+            return self._lmbd_kld_vd
+
+        return self._lmbd_kld_vd * tf.minimum(
+            tf.cast((tf.train.get_global_step() - self.anneal_kld_from) / self.anneal_kld_for, tf.float32),
+            1
+        )
 
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         kld_reprs = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
