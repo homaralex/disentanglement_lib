@@ -35,9 +35,11 @@ import gin.tf
 class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     """Abstract base class of a basic Gaussian encoder model."""
 
-    @property
-    def additional_ops(self):
+    def get_additional_ops(self):
         return []
+
+    def get_additional_logging(self):
+        return {}
 
     def model_fn(self, features, labels, mode, params):
         """TPUEstimator compatible model function."""
@@ -53,20 +55,27 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
         loss = tf.add(reconstruction_loss, regularizer, name="loss")
         elbo = tf.add(reconstruction_loss, kl_loss, name="elbo")
+        additional_logging = self.get_additional_logging()
+
         if mode == tf.estimator.ModeKeys.TRAIN:
             optimizer = optimizers.make_vae_optimizer()
             self._optimizer = optimizer
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             train_op = optimizer.minimize(
                 loss=loss, global_step=tf.train.get_global_step())
-            train_op = tf.group([train_op, update_ops, *self.additional_ops])
+            train_op = tf.group([train_op, update_ops, *self.get_additional_ops()])
+
             tf.summary.scalar("reconstruction_loss", reconstruction_loss)
             tf.summary.scalar("elbo", -elbo)
+
+            for log_name, log_val in additional_logging.items():
+                tf.summary.scalar(log_name, log_val)
 
             logging_hook = tf.train.LoggingTensorHook({
                 "loss": loss,
                 "reconstruction_loss": reconstruction_loss,
-                "elbo": -elbo
+                "elbo": -elbo,
+                **additional_logging,
             },
                 every_n_iter=100)
             return tf.contrib.tpu.TPUEstimatorSpec(
@@ -79,8 +88,8 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
                 mode=mode,
                 loss=loss,
                 eval_metrics=(make_metric_fn("reconstruction_loss", "elbo",
-                                             "regularizer", "kl_loss"),
-                              [reconstruction_loss, -elbo, regularizer, kl_loss]))
+                                             "regularizer", "kl_loss", *additional_logging.keys()),
+                              [reconstruction_loss, -elbo, regularizer, kl_loss, *additional_logging.values()]))
         else:
             raise NotImplementedError("Eval mode not supported.")
 
@@ -527,8 +536,7 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
         self.lmbd_prox = lmbd_prox
         self.all_layers = all_layers
 
-    @property
-    def additional_ops(self):
+    def get_additional_ops(self):
         assert self._optimizer
         # init proximal gradient operations
         min_val = self._optimizer._lr * self.lmbd_prox
@@ -545,7 +553,7 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
             )
             # clip norms to epsilon to prevent zero division
             eps_norms = tf.clip_by_value(t=norms, clip_value_min=1e-16, clip_value_max=tf.float32.max)
-            eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1, ) + tuple(eps_norms.shape))
+            eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1,) + tuple(eps_norms.shape))
 
             new_weights = (weight_tensor / eps_norms) * tf.clip_by_value(
                 t=(norms - min_val),
@@ -555,6 +563,70 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
             self.proximal_ops.append(weight_tensor.assign(new_weights))
 
         return self.proximal_ops
+
+
+@gin.configurable('vd_vae')
+class VDVAE(BetaVAE):
+    def __init__(
+            self,
+            lmbd_kld_vd,
+            anneal_kld_from=0,
+            anneal_kld_for=None,
+            vd_threshold=3.,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self._lmbd_kld_vd = lmbd_kld_vd
+        self.anneal_kld_from = anneal_kld_from
+        self.anneal_kld_for = anneal_kld_for
+        self.vd_threshold = vd_threshold
+
+    def get_weights_to_penalize(self):
+        graph = tf.get_default_graph()
+        node_defs = [n for n in graph.as_graph_def().node if 'log_alpha' in n.name]
+        tensors = (graph.get_tensor_by_name(n.name + ":0") for n in node_defs)
+
+        return tensors
+
+    @property
+    def lmbd_kld_vd(self):
+        if self.anneal_kld_for is None:
+            return self._lmbd_kld_vd
+
+        return self._lmbd_kld_vd * tf.minimum(
+            tf.cast((tf.train.get_global_step() - self.anneal_kld_from) / self.anneal_kld_for, tf.float32),
+            1
+        )
+
+    def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
+        kld_reprs = super().regularizer(kl_loss, z_mean, z_logvar, z_sampled)
+
+        k1, k2, k3 = 0.63576, 1.8732, 1.48695
+        C = -k1
+        kld_vd = sum(
+            tf.reduce_sum(
+                k1 * tf.nn.sigmoid(k2 + k3 * log_alpha) - 0.5 * tf.log1p(tf.exp(-log_alpha)) + C
+            )
+            for log_alpha in self.get_weights_to_penalize()
+        ) / tf.cast(z_mean.shape[0], tf.float32)  # TODO check if that scaling is correct
+
+        return kld_reprs + self.lmbd_kld_vd * kld_vd
+
+    def get_additional_logging(self):
+        log_alphas = self.get_weights_to_penalize()
+
+        N_active, N_total = 0., 0.
+        for la in log_alphas:
+            m = tf.cast(tf.less(la, self.vd_threshold), tf.float32)
+            n_active = tf.reduce_sum(m)
+            n_total = tf.cast(tf.reduce_prod(tf.shape(m)), tf.float32)
+            N_active += n_active
+            N_total += n_total
+        sparsity = 1.0 - N_active / N_total
+
+        return {'sparsity': sparsity}
 
 
 @gin.configurable('wae')

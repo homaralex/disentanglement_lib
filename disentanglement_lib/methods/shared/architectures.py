@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 import gin.tf
 
-from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense
+from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d, vd_dense
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -143,13 +143,14 @@ def fc_encoder(input_tensor, num_latent, is_training=True):
     return means, log_var
 
 
-@gin.configurable("conv_encoder", whitelist=['perc_sparse', 'all_layers', 'perc_units'])
+@gin.configurable("conv_encoder", blacklist=['input_tensor', 'num_latent', 'is_training'])
 def conv_encoder(
         input_tensor,
         num_latent,
         perc_sparse=None,
         all_layers=True,
         perc_units=1.,
+        vd_layers=False,
         is_training=True,
 ):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
@@ -170,25 +171,32 @@ def conv_encoder(
       log_var: Output tensor of shape (batch_size, num_latent) with latent
         variable log variances.
     """
-    del is_training
 
     use_masked = perc_sparse is not None
 
     def conv2d(*args, **kwargs):
-        if use_masked and all_layers:
-            conv_fn = masked_conv2d
-            kwargs['perc_sparse'] = perc_sparse
-        else:
-            conv_fn = tf.layers.conv2d
+        conv_fn = tf.layers.conv2d
+
+        if all_layers:
+            if use_masked:
+                conv_fn = masked_conv2d
+                kwargs['perc_sparse'] = perc_sparse
+            elif vd_layers:
+                kwargs['training_phase'] = is_training
+                conv_fn = vd_conv2d
 
         return conv_fn(*args, **kwargs)
 
     def dense(*args, **kwargs):
-        if use_masked and (all_layers or kwargs['name'] in ('means', 'log_var')):
-            dense_fn = masked_dense
-            kwargs['perc_sparse'] = perc_sparse
-        else:
-            dense_fn = tf.layers.dense
+        dense_fn = tf.layers.dense
+
+        if all_layers or kwargs['name'] in ('means', 'log_var'):
+            if use_masked:
+                dense_fn = masked_dense
+                kwargs['perc_sparse'] = perc_sparse
+            elif vd_layers:
+                kwargs['training_phase'] = is_training
+                dense_fn = vd_dense
 
         return dense_fn(*args, **kwargs)
 

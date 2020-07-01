@@ -281,9 +281,47 @@ class ProximalStudy(BaseSparsityStudy):
         return all_models
 
 
-class VariationalDropoutStudy(BaseSparsityStudy):
-    def __init__(self, *args, **kwargs):
+class VDStudy(BaseSparsityStudy):
+    def __init__(
+            self,
+            anneal_kld_from=0,
+            anneal_kld_for=None,
+            all_layers=True,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+
+        self.anneal_kld_from = anneal_kld_from
+        self.anneal_kld_for = anneal_kld_for
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "vd_vae")
+        model_fn = h.fixed("model.model", "@vd_vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
+        vd_layers = h.fixed('conv_encoder.vd_layers', True)
+        vd_threshold = h.fixed('vd_vae.vd_threshold', 3.)
+        anneal_kld_from = h.fixed('vd_vae.anneal_kld_from', self.anneal_kld_from)
+        anneal_kld_for = h.fixed('vd_vae.anneal_kld_for', self.anneal_kld_for)
+
+        lmbd_kld_vd = h.sweep("vd_vae.lmbd_kld_vd", h.discrete([*np.logspace(-3, 3, 6, endpoint=False)]))
+        config_vdm = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            all_layers,
+            vd_layers,
+            vd_threshold,
+            anneal_kld_from,
+            anneal_kld_for,
+            lmbd_kld_vd,
+        ])
+
+        all_models = h.chainit([config_vdm, ])
+
+        return all_models
 
 
 class WAEStudy(BaseSparsityStudy):
