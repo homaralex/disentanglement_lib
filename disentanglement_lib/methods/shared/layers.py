@@ -187,7 +187,7 @@ def masked_dense(
 
 
 # TODO other parameterization version
-class VDMaskedConv2D(tf.layers.Conv2D):
+class _BaseVDLayer:
     def __init__(
             self,
             training_phase,
@@ -204,7 +204,7 @@ class VDMaskedConv2D(tf.layers.Conv2D):
 
     def _build(self):
         self.log_sigma_2 = self.add_weight(
-            name='vdm_log_sigma_2',
+            name='vd_log_sigma_2',
             shape=self.mask_shape,
             initializer=init_ops.Constant(-10.),
             trainable=True,
@@ -223,15 +223,16 @@ class VDMaskedConv2D(tf.layers.Conv2D):
 
     @property
     def vd_threshold(self):
+        # TODO maybe this should be a little more elegant
         return gin.query_parameter('vd_vae.vd_threshold')
 
-    def call(self, inputs):
+    def _get_outputs(self, inputs, layer_op):
         log_alpha = self.get_log_alpha()
 
         if self.training_phase:
-            mu = self._convolution_op(inputs, self.kernel)
+            mu = layer_op(inputs, self.kernel)
             std = tf.sqrt(
-                self._convolution_op(
+                layer_op(
                     tf.square(inputs),
                     tf.exp(log_alpha) * tf.square(self.kernel),
                 ) + _EPS,
@@ -241,9 +242,16 @@ class VDMaskedConv2D(tf.layers.Conv2D):
             outputs = noisy_out
         else:
             select_mask = tf.cast(tf.less(log_alpha, self.vd_threshold), tf.float32)
-            masked_out = self._convolution_op(inputs, self.kernel * select_mask)
+            masked_out = layer_op(inputs, self.kernel * select_mask)
 
             outputs = masked_out
+
+        return outputs
+
+
+class VDConv2D(_BaseVDLayer, tf.layers.Conv2D):
+    def call(self, inputs):
+        outputs = self._get_outputs(inputs, self._convolution_op)
 
         if self.use_bias:
             if self.data_format == 'channels_first':
@@ -283,7 +291,7 @@ def vd_conv2d(
         name=None,
         reuse=None,
 ):
-    layer = VDMaskedConv2D(
+    layer = VDConv2D(
         filters=filters,
         kernel_size=kernel_size,
         strides=strides,
@@ -303,6 +311,80 @@ def vd_conv2d(
         name=name,
         _reuse=reuse,
         _scope=name,
+        training_phase=training_phase,
+    )
+    return layer.apply(inputs)
+
+
+class VDDense(_BaseVDLayer, Dense):
+    def call(self, inputs):
+        inputs = ops.convert_to_tensor(inputs)
+        rank = common_shapes.rank(inputs)
+
+        if rank > 2:
+            # Broadcasting is required for the inputs.
+
+            def _broadcasted_tensordot(_inputs, _kernel):
+                return standard_ops.tensordot(
+                    _inputs,
+                    _kernel,
+                    [[rank - 1], [0]]
+                )
+
+            outputs = self._get_outputs(inputs, _broadcasted_tensordot)
+
+            # Reshape the output back to the original ndim of the input.
+            if not context.executing_eagerly():
+                shape = inputs.shape.as_list()
+                output_shape = shape[:-1] + [self.units]
+                outputs.set_shape(output_shape)
+        else:
+            # Cast the inputs to self.dtype, which is the variable dtype. We do not
+            # cast if `should_cast_variables` is True, as in that case the variable
+            # will be automatically casted to inputs.dtype.
+            if not self._mixed_precision_policy.should_cast_variables:
+                inputs = math_ops.cast(inputs, self.dtype)
+
+            outputs = self._get_outputs(inputs, gen_math_ops.mat_mul)
+
+        if self.use_bias:
+            outputs = nn.bias_add(outputs, self.bias)
+        if self.activation is not None:
+            return self.activation(outputs)  # pylint: disable=not-callable
+        return outputs
+
+
+def vd_dense(
+        inputs, units,
+        training_phase,
+        activation=None,
+        use_bias=True,
+        kernel_initializer=None,
+        bias_initializer=init_ops.zeros_initializer(),
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        activity_regularizer=None,
+        kernel_constraint=None,
+        bias_constraint=None,
+        trainable=True,
+        name=None,
+        reuse=None,
+):
+    layer = VDDense(
+        units=units,
+        activation=activation,
+        use_bias=use_bias,
+        kernel_initializer=kernel_initializer,
+        bias_initializer=bias_initializer,
+        kernel_regularizer=kernel_regularizer,
+        bias_regularizer=bias_regularizer,
+        activity_regularizer=activity_regularizer,
+        kernel_constraint=kernel_constraint,
+        bias_constraint=bias_constraint,
+        trainable=trainable,
+        name=name,
+        _scope=name,
+        _reuse=reuse,
         training_phase=training_phase,
     )
     return layer.apply(inputs)

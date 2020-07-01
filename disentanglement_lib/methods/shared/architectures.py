@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 import gin.tf
 
-from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d
+from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d, vd_dense
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -187,13 +187,16 @@ def conv_encoder(
 
         return conv_fn(*args, **kwargs)
 
-    # TODO vd_dense
     def dense(*args, **kwargs):
-        if use_masked and (all_layers or kwargs['name'] in ('means', 'log_var')):
-            dense_fn = masked_dense
-            kwargs['perc_sparse'] = perc_sparse
-        else:
-            dense_fn = tf.layers.dense
+        dense_fn = tf.layers.dense
+
+        if all_layers or kwargs['name'] in ('means', 'log_var'):
+            if use_masked:
+                dense_fn = masked_dense
+                kwargs['perc_sparse'] = perc_sparse
+            elif vd_layers:
+                kwargs['training_phase'] = is_training
+                dense_fn = vd_dense
 
         return dense_fn(*args, **kwargs)
 
