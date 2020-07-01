@@ -162,6 +162,8 @@ def evaluate(model_dir,
   results.update_result_directory(results_dir, "evaluation", results_dict,
                                   original_results_dir)
 
+  del dataset
+
 
 def _has_kwarg_or_kwargs(f, kwarg):
   """Checks if the function has the provided kwarg or **kwargs."""
