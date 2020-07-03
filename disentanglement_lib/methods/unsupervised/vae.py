@@ -573,6 +573,7 @@ class VDVAE(BetaVAE):
             anneal_kld_from=0,
             anneal_kld_for=None,
             vd_threshold=3.,
+            scale_per_layer=gin.REQUIRED,
             *args,
             **kwargs,
     ):
@@ -582,6 +583,7 @@ class VDVAE(BetaVAE):
         self.anneal_kld_from = anneal_kld_from
         self.anneal_kld_for = anneal_kld_for
         self.vd_threshold = vd_threshold
+        self.scale_per_layer = scale_per_layer
 
     def get_weights_to_penalize(self):
         graph = tf.get_default_graph()
@@ -608,7 +610,7 @@ class VDVAE(BetaVAE):
         kld_vd = sum(
             tf.reduce_sum(
                 k1 * tf.nn.sigmoid(k2 + k3 * log_alpha) - 0.5 * tf.log1p(tf.exp(-log_alpha)) + C
-            )
+            ) / (tf.size(log_alpha, out_type=tf.float32) if self.scale_per_layer else 1)
             for log_alpha in self.get_weights_to_penalize()
         ) / tf.cast(z_mean.shape[0], tf.float32)  # TODO check if that scaling is correct
 

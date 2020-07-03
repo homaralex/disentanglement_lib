@@ -284,6 +284,7 @@ class ProximalStudy(BaseSparsityStudy):
 class VDStudy(BaseSparsityStudy):
     def __init__(
             self,
+            scale_per_layer,
             anneal_kld_from=0,
             anneal_kld_for=None,
             all_layers=True,
@@ -295,6 +296,7 @@ class VDStudy(BaseSparsityStudy):
         self.anneal_kld_from = anneal_kld_from
         self.anneal_kld_for = anneal_kld_for
         self.all_layers = all_layers
+        self.scale_per_layer = scale_per_layer
 
     def get_default_models(self):
         model_name = h.fixed("model.name", "vd_vae")
@@ -303,6 +305,7 @@ class VDStudy(BaseSparsityStudy):
         all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
         vd_layers = h.fixed('conv_encoder.vd_layers', True)
         vd_threshold = h.fixed('vd_vae.vd_threshold', 3.)
+        scale_per_layer = h.fixed('vd_vae.scale_per_layer', self.scale_per_layer)
         anneal_kld_from = h.fixed('vd_vae.anneal_kld_from', self.anneal_kld_from)
         anneal_kld_for = h.fixed('vd_vae.anneal_kld_for', self.anneal_kld_for)
 
@@ -314,6 +317,7 @@ class VDStudy(BaseSparsityStudy):
             all_layers,
             vd_layers,
             vd_threshold,
+            scale_per_layer,
             anneal_kld_from,
             anneal_kld_for,
             lmbd_kld_vd,
