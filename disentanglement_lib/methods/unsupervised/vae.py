@@ -552,14 +552,10 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
                 keepdims=True,
             )
             # clip norms to epsilon to prevent zero division
-            eps_norms = tf.clip_by_value(t=norms, clip_value_min=1e-16, clip_value_max=tf.float32.max)
+            eps_norms = tf.maximum(norms, 1e-16)
             eps_norms = eps_norms if is_matrix else tf.reshape(eps_norms, (1, 1,) + tuple(eps_norms.shape))
 
-            new_weights = (weight_tensor / eps_norms) * tf.clip_by_value(
-                t=(norms - min_val),
-                clip_value_min=0,
-                clip_value_max=tf.float32.max,
-            )
+            new_weights = weight_tensor * tf.maximum(norms - min_val, 0.) / eps_norms
             self.proximal_ops.append(weight_tensor.assign(new_weights))
 
         return self.proximal_ops
