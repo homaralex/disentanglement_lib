@@ -159,6 +159,13 @@ _variational_studies = {
     for s in _sweep_variational
 }
 
+
+_sweep_softmax = h.product((_betas, _datasets, _all_layers))
+_softmax_studies = {
+    f"{s['dataset']}_softmax_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.SoftmaxStudy(**s)
+    for s in _sweep_softmax
+}
+
 _sweep_small = h.product((_betas, _datasets))
 _small_studies = {
     f"{s['dataset']}_small_vae_b_{s['beta']}": sparsity_study.SmallVAEStudy(**s)
@@ -198,6 +205,7 @@ STUDIES = {
     **_masked_studies,
     **_proximal_studies,
     **_variational_studies,
+    **_softmax_studies,
     **_weight_decay_studies,
     **_small_studies,
     **_baseline_studies,

@@ -328,6 +328,31 @@ class VDStudy(BaseSparsityStudy):
         return all_models
 
 
+class SoftmaxStudy(BaseSparsityStudy):
+    def __init__(self, all_layers=True, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "softmax_vae")
+        model_fn = h.fixed("model.model", "@vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        softmax_layers = h.fixed('conv_encoder.softmax_layers', True)
+        all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
+
+        config_masked = h.zipit([
+            model_name,
+            model_fn,
+            beta,
+            softmax_layers,
+            all_layers,
+        ])
+
+        all_models = h.chainit([config_masked, ])
+
+        return all_models
+
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, *args, **kwargs):
         # add a placeholder for beta
