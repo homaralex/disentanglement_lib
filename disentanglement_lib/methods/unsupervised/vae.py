@@ -603,7 +603,7 @@ class VDVAE(BetaVAE):
 
         k1, k2, k3 = 0.63576, 1.8732, 1.48695
         C = -k1
-        kld_vd = sum(
+        kld_vd = -sum(
             tf.reduce_sum(
                 k1 * tf.nn.sigmoid(k2 + k3 * log_alpha) - 0.5 * tf.log1p(tf.exp(-log_alpha)) + C
             ) / (tf.size(log_alpha, out_type=tf.float32) if self.scale_per_layer else 1)
