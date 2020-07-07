@@ -309,7 +309,8 @@ class VDStudy(BaseSparsityStudy):
         anneal_kld_from = h.fixed('vd_vae.anneal_kld_from', self.anneal_kld_from)
         anneal_kld_for = h.fixed('vd_vae.anneal_kld_for', self.anneal_kld_for)
 
-        lmbd_kld_vd = h.sweep("vd_vae.lmbd_kld_vd", h.discrete([*np.logspace(-3, 3, 6, endpoint=False)]))
+        lmbd_kld_vd = h.sweep("vd_vae.lmbd_kld_vd", h.discrete([*np.logspace(-5, 1, 6, endpoint=False)]))
+
         config_vdm = h.zipit([
             model_name,
             model_fn,
