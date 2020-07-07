@@ -339,6 +339,10 @@ class SoftmaxStudy(BaseSparsityStudy):
         model_fn = h.fixed("model.model", "@vae()")
         beta = h.fixed('vae.beta', self.beta)
         softmax_layers = h.fixed('conv_encoder.softmax_layers', True)
+        softmax_temperature = h.sweep(
+            'conv_encoder.softmax_temperature',
+            h.discrete(np.logspace(1., -3, 6, endpoint=False)),
+        )
         all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
 
         config_masked = h.zipit([
@@ -346,6 +350,7 @@ class SoftmaxStudy(BaseSparsityStudy):
             model_fn,
             beta,
             softmax_layers,
+            softmax_temperature,
             all_layers,
         ])
 

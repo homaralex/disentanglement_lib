@@ -153,6 +153,7 @@ def conv_encoder(
         perc_units=1.,
         vd_layers=False,
         softmax_layers=False,
+        softmax_temperature=1.,
         is_training=True,
 ):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
@@ -187,6 +188,7 @@ def conv_encoder(
                 kwargs['training_phase'] = is_training
                 conv_fn = vd_conv2d
             elif softmax_layers:
+                kwargs['temperature'] = softmax_temperature
                 conv_fn = softmax_conv2d
 
         return conv_fn(*args, **kwargs)
@@ -202,6 +204,7 @@ def conv_encoder(
                 kwargs['training_phase'] = is_training
                 dense_fn = vd_dense
             elif softmax_layers:
+                kwargs['temperature'] = softmax_temperature
                 dense_fn = softmax_dense
 
         return dense_fn(*args, **kwargs)

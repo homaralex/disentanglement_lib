@@ -390,13 +390,20 @@ def vd_dense(
     return layer.apply(inputs)
 
 
-class SoftmaxConv2d(tf.layers.Conv2D):
+class _BaseSoftmaxLayer:
+    def __init__(self, temperature, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.temperature = temperature
+
+
+class SoftmaxConv2d(_BaseSoftmaxLayer, tf.layers.Conv2D):
     def call(self, inputs):
         softmax_kernel = self.kernel * tf.nn.softmax(
             logits=tf.reshape(
                 tf.reduce_max(tf.abs(self.kernel), axis=(0, 1)),
                 (self.kernel.shape[2], -1),
-            ),
+            ) / self.temperature,
             axis=0,
         )
 
@@ -442,6 +449,7 @@ def softmax_conv2d(
         trainable=True,
         name=None,
         reuse=None,
+        temperature=1.,
 ):
     layer = SoftmaxConv2d(
         filters=filters,
@@ -463,17 +471,18 @@ def softmax_conv2d(
         name=name,
         _reuse=reuse,
         _scope=name,
+        temperature=temperature,
     )
     return layer.apply(inputs)
 
 
-class SoftmaxDense(Dense):
+class SoftmaxDense(_BaseSoftmaxLayer, Dense):
     def call(self, inputs):
         inputs = ops.convert_to_tensor(inputs)
         rank = common_shapes.rank(inputs)
 
         softmax_kernel = self.kernel * tf.nn.softmax(
-            logits=tf.abs(self.kernel),
+            logits=tf.abs(self.kernel) / self.temperature,
             axis=0,
         )
 
@@ -522,6 +531,7 @@ def softmax_dense(
         trainable=True,
         name=None,
         reuse=None,
+        temperature=1.,
 ):
     layer = SoftmaxDense(
         units=units,
@@ -538,5 +548,6 @@ def softmax_dense(
         name=name,
         _scope=name,
         _reuse=reuse,
+        temperature=temperature,
     )
     return layer.apply(inputs)
