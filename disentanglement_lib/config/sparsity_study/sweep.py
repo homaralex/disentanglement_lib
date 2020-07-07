@@ -341,7 +341,7 @@ class SoftmaxStudy(BaseSparsityStudy):
         softmax_layers = h.fixed('conv_encoder.softmax_layers', True)
         softmax_temperature = h.sweep(
             'conv_encoder.softmax_temperature',
-            h.discrete(np.logspace(1., -3, 6, endpoint=False)),
+            h.discrete(np.logspace(3., -3., 6, endpoint=False)),
         )
         all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
 
