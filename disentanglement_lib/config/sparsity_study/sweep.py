@@ -252,7 +252,7 @@ class MaskL1Study(DimWiseMaskL1Study):
 class ProximalStudy(BaseSparsityStudy):
     def __init__(
             self,
-            lmbd_prox_range=np.logspace(2, -3, 6),
+            lmbd_prox_range=np.logspace(0, -5, 6),
             all_layers=True,
             *args,
             **kwargs,
