@@ -19,19 +19,19 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
 DIS_METRICS = (
-    'beta_vae_sklearn',
-    'factor_vae_metric',
-    'evaluation_results.discrete_mig',
+    # 'beta_vae_sklearn',
+    # 'factor_vae_metric',
+    # 'evaluation_results.discrete_mig',
     'evaluation_results.disentanglement',
     'evaluation_results.modularity_score',
-    'evaluation_results.SAP_score',
+    # 'evaluation_results.SAP_score',
 
     # 'train_results.loss',
     # 'train_results.regularizer',
 
-    # 'evaluation_results.completeness',
-    # 'evaluation_results.informativeness_test',
-    # 'evaluation_results.explicitness_score_test',
+    'evaluation_results.completeness',
+    'evaluation_results.informativeness_test',
+    'evaluation_results.explicitness_score_test',
 
     # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
@@ -44,36 +44,51 @@ UNSUP_METRICS = (
 )
 DATASETS = (
     'dsprites_full',
+    'color_dsprites',
+    # 'noisy_dsprites',
     'scream_dsprites',
     'shapes3d',
     'cars3d',
+    'smallnorb',
 )
 METHODS = (
-    'masked',
-    'dim_wise_mask_l1_col',
-    'dim_wise_mask_l1',
-    'small_vae',
-    'weight_decay',
+    # 'masked',
+    # 'dim_wise_mask_l1_col',
+    # 'dim_wise_mask_l1',
+    'vd_vae',
+    # 'proximal_vae',
+
+    # 'small_vae',
+    # 'weight_decay',
     # 'dim_wise_mask_l1_row',
 )
 
 HUMAN_READABLE_NAMES = {
+
     # methods
     'masked': 'RPM',
     'dim_wise_mask_l1_col': 'Dim-Wise LL1M',
     'dim_wise_mask_l1': 'LL1M',
+    'vd_vae': 'VD',
+    'proximal_vae': 'Proximal',
     'small_vae': 'Small-VAE',
     'weight_decay': 'Weight Decay',
     'beta_vae': 'BetaVAE',
+
     # datasets
     'dsprites_full': 'dSprites',
+    'color_dsprites': 'Color-dSprites',
+    'noisy_dsprites': 'Noisy-dSprites',
     'scream_dsprites': 'Scream-dSprites',
     'shapes3d': 'Shapes3D',
     'cars3d': 'Cars3D',
+    'smallnorb': 'Norb',
+
     # unsup metrics
     'train_results.reconstruction_loss': 'Reconstruction',
     'train_results.kl_loss': 'KL',
     'train_results.elbo': 'ELBO',
+
     # dis metrics
     'beta_vae_sklearn': 'BetaVAE Score',
     'factor_vae_metric': 'FactorVAE Score',
@@ -81,6 +96,11 @@ HUMAN_READABLE_NAMES = {
     'evaluation_results.disentanglement': 'DCI Disentanglement',
     'evaluation_results.modularity_score': 'Modularity',
     'evaluation_results.SAP_score': 'SAP Score',
+
+    # 'completeness' metrics
+    'evaluation_results.completeness': 'completeness',
+    'evaluation_results.informativeness_test': 'informativeness',
+    'evaluation_results.explicitness_score_test': 'explicitness',
 }
 
 PLOT_DIR = Path('plots')
@@ -120,6 +140,10 @@ def get_reg_col_name(method):
         return 'train_config.dim_wise_l1_vae.lmbd_l2'
     elif 'small_vae' in method:
         return 'train_config.conv_encoder.perc_units'
+    elif 'vd' in method:
+        return 'train_config.vd_vae.lmbd_kld_vd'
+    elif 'proximal' in method:
+        return 'train_config.proximal_vae.lmbd_prox'
     raise ValueError(method)
 
 
@@ -499,17 +523,23 @@ def main():
             True,
             # False,
         )),
+        h.sweep('anneal', (
+            True,
+            False,
+        )),
     ))
 
     df_list = []
     for setting in sweep:
-        dataset, method, beta, all_layers, scale = setting['dataset'], setting['method'], setting['beta'], setting[
-            'all_layers'], setting['scale']
+        dataset, method, beta, all_layers, scale, anneal = setting['dataset'], setting['method'], setting['beta'], \
+                                                           setting[
+                                                               'all_layers'], setting['scale'], setting['anneal']
 
-        if 'masked' in method or 'small' in method or 'weight_decay' in method:
+        if 'masked' in method or 'small' in method or 'weight_decay' in method or 'vd' in method or 'proximal' in method:
             scale = False
-
-        out_dir = PLOT_DIR / (method + ('_all' if all_layers else '') + ('_scale' if scale else '')) / f'beta_{beta}'
+        # scale = True
+        out_dir = PLOT_DIR / (method + ('_anneal' if anneal else '') + ('_all' if all_layers else '') + (
+            '_scale' if scale else '')) / f'beta_{beta}'
 
         df = load_results()
 
@@ -531,8 +561,11 @@ def main():
         idxs_all_layers = (df['train_config.dim_wise_l1_vae.all_layers'] == 'True') | (
                 df['train_config.conv_encoder.all_layers'] == 'True')
         df = df.loc[idxs_all_layers] if all_layers else df.loc[~idxs_all_layers]
-        idxs_scale = (df['train_config.dim_wise_l1_vae.scale_per_layer'] == 'True')
+        scale_col = 'vd_vae.scale_per_layer' if 'vd' in method else 'dim_wise_l1_vae.scale_per_layer'
+        idxs_scale = (df['train_config.' + scale_col] == 'True')
         df = df.loc[idxs_scale] if scale else df.loc[~idxs_scale]
+        idxs_anneal = (~df['train_config.vd_vae.anneal_kld_for'].isin(('None', None)))
+        df = df.loc[idxs_anneal] if anneal else df.loc[~idxs_anneal]
 
         print(dataset, out_dir.parts[1:])
         print(len(df))
@@ -576,6 +609,11 @@ def main():
             ).map(str)
             reg_weight_col = 'train_config.conv_encoder.perc_sparse'
             df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
+        elif 'vd' in method:
+            reg_weight_col = 'train_config.vd_vae.lmbd_kld_vd'
+        elif 'proximal' in method:
+            reg_weight_col = 'train_config.proximal_vae.lmbd_prox'
+        # ablation test methods
         elif 'weight_decay' in method:
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
         elif 'small_vae' in method:
@@ -620,9 +658,9 @@ def main():
     df = df.loc[df['train_config.vae.beta'] == 16]
 
     plot_fig_15(df)
-    plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
-    plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
-    plot_fig_18(df, methods=METHODS[:3])
+    # plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
+    # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
+    # plot_fig_18(df, methods=METHODS[:3])
 
     # print_rankings(df)
 
