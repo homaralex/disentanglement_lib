@@ -33,6 +33,8 @@ DIS_METRICS = (
     'evaluation_results.informativeness_test',
     'evaluation_results.explicitness_score_test',
 
+    'train_results.reconstruction_loss',
+
     # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
     # 'evaluation_results.gaussian_wasserstein_correlation_norm',
@@ -44,18 +46,19 @@ UNSUP_METRICS = (
 )
 DATASETS = (
     'dsprites_full',
-    'color_dsprites',
+    # 'color_dsprites',
     # 'noisy_dsprites',
     'scream_dsprites',
-    'shapes3d',
-    'cars3d',
-    'smallnorb',
+    # 'shapes3d',
+    # 'cars3d',
+    # 'smallnorb',
 )
 METHODS = (
     # 'masked',
     # 'dim_wise_mask_l1_col',
     # 'dim_wise_mask_l1',
     'vd_vae',
+    'softmax_vae',
     # 'proximal_vae',
 
     # 'small_vae',
@@ -144,6 +147,8 @@ def get_reg_col_name(method):
         return 'train_config.vd_vae.lmbd_kld_vd'
     elif 'proximal' in method:
         return 'train_config.proximal_vae.lmbd_prox'
+    elif 'softmax' in method:
+        return 'train_config.conv_encoder.softmax_temperature'
     raise ValueError(method)
 
 
@@ -526,7 +531,7 @@ def main():
             False,
         )),
         h.sweep('anneal', (
-            True,
+            # True,
             False,
         )),
     ))
@@ -616,6 +621,8 @@ def main():
             reg_weight_col = 'train_config.vd_vae.lmbd_kld_vd'
         elif 'proximal' in method:
             reg_weight_col = 'train_config.proximal_vae.lmbd_prox'
+        elif 'softmax' in method:
+            reg_weight_col = 'train_config.conv_encoder.softmax_temperature'
         # ablation test methods
         elif 'weight_decay' in method:
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
@@ -650,8 +657,6 @@ def main():
         #     out_dir=out_dir,
         #     reg_weight_col=reg_weight_col,
         # )
-
-        # df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
 
         df = df.loc[df[reg_weight_col] != 0]
         df_list.append(df)
