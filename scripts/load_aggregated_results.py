@@ -272,7 +272,9 @@ def plot_fig_15(df, methods=METHODS):
                     x=(0, 5) if 'small' in method else x_range,
                     y=(grouped_df.iloc[::-1] if 'small' in method else grouped_df).values,
                     ax=ax,
-                    label=HUMAN_READABLE_NAMES[method],
+                    # TODO change to readable
+                    label=method,
+                    # label=HUMAN_READABLE_NAMES[method],
                     linewidth=4,
                 )
 
@@ -520,8 +522,8 @@ def main():
             # False,
         )),
         h.sweep('scale', (
-            True,
-            # False,
+            # True,
+            False,
         )),
         h.sweep('anneal', (
             True,
@@ -530,14 +532,15 @@ def main():
     ))
 
     df_list = []
+    model_names = set()
     for setting in sweep:
         dataset, method, beta, all_layers, scale, anneal = setting['dataset'], setting['method'], setting['beta'], \
                                                            setting[
                                                                'all_layers'], setting['scale'], setting['anneal']
 
-        if 'masked' in method or 'small' in method or 'weight_decay' in method or 'vd' in method or 'proximal' in method:
+        if 'masked' in method or 'small' in method or 'weight_decay' in method or 'proximal' in method:
             scale = False
-        # scale = True
+
         out_dir = PLOT_DIR / (method + ('_anneal' if anneal else '') + ('_all' if all_layers else '') + (
             '_scale' if scale else '')) / f'beta_{beta}'
 
@@ -625,6 +628,10 @@ def main():
         else:
             dlib_df = load_dlib_df()
 
+        model_name = out_dir.parent.name
+        df[MODEL_COL_STR] = model_name
+        model_names.add(model_name)
+
         dlib_df[reg_weight_col] = 0
         df = pd.concat((df, dlib_df), sort=True)
         df = df.loc[
@@ -633,6 +640,7 @@ def main():
             ]
         if len(df[MODEL_COL_STR].unique()) < 2:
             continue
+
         df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace("'", '')
 
         # out_dir.mkdir(exist_ok=True, parents=True)
@@ -643,7 +651,7 @@ def main():
         #     reg_weight_col=reg_weight_col,
         # )
 
-        df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
+        # df[MODEL_COL_STR] = out_dir.parent.name + '_' + df[MODEL_COL_STR]
 
         df = df.loc[df[reg_weight_col] != 0]
         df_list.append(df)
@@ -657,7 +665,7 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    plot_fig_15(df)
+    plot_fig_15(df, methods=model_names)
     # plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_18(df, methods=METHODS[:3])
