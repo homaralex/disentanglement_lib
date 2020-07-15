@@ -379,7 +379,7 @@ class WAEStudy(BaseSparsityStudy):
         model_fn = h.fixed("model.model", "@wae()")
         scale = h.fixed("wae.scale", 1 / 8)
         adaptive = h.fixed("wae.adaptive", True)
-        betas = h.sweep("vae.beta", h.discrete([*np.logspace(-4, -2, 3)]))
+        betas = h.sweep("vae.beta", h.discrete([*np.logspace(-2, 1, 6, endpoint=False)]))
         config_vae = h.zipit([
             model_name,
             model_fn,
