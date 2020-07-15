@@ -330,8 +330,16 @@ class VDStudy(BaseSparsityStudy):
 
 
 class SoftmaxStudy(BaseSparsityStudy):
-    def __init__(self, all_layers=True, *args, **kwargs):
+    def __init__(
+            self,
+            scale_temperature,
+            all_layers=True,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+
+        self.scale_temperature = scale_temperature
         self.all_layers = all_layers
 
     def get_default_models(self):
@@ -339,6 +347,7 @@ class SoftmaxStudy(BaseSparsityStudy):
         model_fn = h.fixed("model.model", "@vae()")
         beta = h.fixed('vae.beta', self.beta)
         softmax_layers = h.fixed('conv_encoder.softmax_layers', True)
+        scale_temperature = h.fixed('conv_encoder.scale_temperature', self.scale_temperature)
         softmax_temperature = h.sweep(
             'conv_encoder.softmax_temperature',
             h.discrete(np.logspace(3., -3., 6, endpoint=False)),
@@ -350,6 +359,7 @@ class SoftmaxStudy(BaseSparsityStudy):
             model_fn,
             beta,
             softmax_layers,
+            scale_temperature,
             softmax_temperature,
             all_layers,
         ])

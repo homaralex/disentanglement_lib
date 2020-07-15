@@ -391,10 +391,23 @@ def vd_dense(
 
 
 class _BaseSoftmaxLayer:
-    def __init__(self, temperature, *args, **kwargs):
+    def __init__(
+            self,
+            temperature,
+            scale_temperature,
+            *args,
+            **kwargs,
+    ):
         super().__init__(*args, **kwargs)
 
-        self.temperature = temperature
+        self._temperature = temperature
+        self.scale_temperature = scale_temperature
+
+    @property
+    def temperature(self):
+        if self.scale_temperature:
+            return self._temperature / tf.cast(self.kernel.shape[-2], tf.float32)
+        return self._temperature
 
 
 class SoftmaxConv2d(_BaseSoftmaxLayer, tf.layers.Conv2D):
@@ -450,6 +463,7 @@ def softmax_conv2d(
         name=None,
         reuse=None,
         temperature=1.,
+        scale_temperature=False,
 ):
     layer = SoftmaxConv2d(
         filters=filters,
@@ -472,6 +486,7 @@ def softmax_conv2d(
         _reuse=reuse,
         _scope=name,
         temperature=temperature,
+        scale_temperature=scale_temperature,
     )
     return layer.apply(inputs)
 
@@ -532,6 +547,7 @@ def softmax_dense(
         name=None,
         reuse=None,
         temperature=1.,
+        scale_temperature=False,
 ):
     layer = SoftmaxDense(
         units=units,
@@ -549,5 +565,6 @@ def softmax_dense(
         _scope=name,
         _reuse=reuse,
         temperature=temperature,
+        scale_temperature=scale_temperature,
     )
     return layer.apply(inputs)

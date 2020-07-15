@@ -160,9 +160,10 @@ _variational_studies = {
 }
 
 
-_sweep_softmax = h.product((_betas, _datasets, _all_layers))
+_scale_temperature = h.sweep('scale_temperature', (True, False))
+_sweep_softmax = h.product((_betas, _datasets, _all_layers, _scale_temperature))
 _softmax_studies = {
-    f"{s['dataset']}_softmax_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.SoftmaxStudy(**s)
+    f"{s['dataset']}_softmax_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_temperature'] else ''}b_{s['beta']}": sparsity_study.SoftmaxStudy(**s)
     for s in _sweep_softmax
 }
 
