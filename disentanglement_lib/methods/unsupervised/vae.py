@@ -627,6 +627,15 @@ class VDVAE(BetaVAE):
         return {'sparsity': sparsity}
 
 
+def pdist(x, y):
+    n, d = x.get_shape().as_list()
+
+    tiled_x = tf.tile(tf.expand_dims(x, 1), (1, n, 1))
+    tiled_y = tf.tile(tf.expand_dims(y, 0), (n, 1, 1))
+
+    return tiled_x - tiled_y
+
+
 @gin.configurable('wae')
 class WAE(BetaVAE):
     def __init__(self, scale, adaptive, *args, **kwargs):
@@ -637,27 +646,33 @@ class WAE(BetaVAE):
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         del kl_loss
 
-        z = z_sampled
-        nf = tf.cast(tf.shape(z)[0], "float32")
-        latent_dim = tf.cast(tf.shape(z)[1], "float32")
+        z_var = tf.square(z_logvar)
+        n, d = z_mean.get_shape().as_list()
 
-        norms2 = tf.reduce_sum(tf.square(z), axis=1, keepdims=True)
-        dotprods = tf.matmul(z, z, transpose_b=True)
-        dists2 = norms2 + tf.transpose(norms2) - 2. * dotprods
-
+        gamma_sqrd = self.scale * d
         if self.adaptive:
-            mean_norms2 = tf.reduce_mean(norms2)
-            gamma2 = tf.stop_gradient(self.scale * mean_norms2)
-        else:
-            gamma2 = self.scale * latent_dim
+            norms_z = tf.square(z_mean)
+            mean_norms_z = tf.reduce_mean(norms_z)
+            gamma_sqrd = self.scale * mean_norms_z
 
-        variance = (gamma2 / (2. + gamma2)) ** latent_dim + (gamma2 / (4. + gamma2)) ** (latent_dim / 2.) - 2. * (
-                gamma2 ** 2. / ((1. + gamma2) * (3. + gamma2))) ** (latent_dim / 2.)
-        variance = 2. * variance / (nf * (nf - 1.))
-        variance_normalization = variance ** (-1. / 2.)
+        first_term = tf.pow(gamma_sqrd / (2 + gamma_sqrd), d / 2)
 
-        Ekzz = (tf.reduce_sum(tf.exp(-dists2 / (2. * gamma2))) - nf) / (nf * nf - nf)
-        Ekzn = (gamma2 / (1. + gamma2)) ** (latent_dim / 2.) * tf.reduce_mean(tf.exp(-norms2 / (2. * (1. + gamma2))))
-        Eknn = (gamma2 / (2. + gamma2)) ** (latent_dim / 2.)
+        second_term = tf.sqrt(gamma_sqrd / (1 + gamma_sqrd + z_var))
+        second_term = second_term * tf.exp(-tf.square(z_mean) / (2 * (1 + gamma_sqrd + z_var)))
+        second_term = tf.reduce_sum(tf.reduce_prod(second_term, axis=1), axis=0)
+        second_term = -2 * second_term / n
 
-        return variance_normalization * (Ekzz - 2. * Ekzn + Eknn) * self.beta
+        sum_vars = pdist(z_var, - z_var)
+        third_term = tf.sqrt(gamma_sqrd / (gamma_sqrd + sum_vars))
+        diffs_mu = pdist(z_mean, z_mean)
+        third_term = third_term * tf.exp(-tf.square(diffs_mu) / (2 * (gamma_sqrd + sum_vars)))
+        third_term = tf.reduce_sum(tf.reduce_prod(third_term, axis=2))
+        third_term = third_term / n / n
+
+        stat = first_term + second_term + third_term
+
+        var_g_d_n = 2 * (tf.pow(gamma_sqrd / (2 + gamma_sqrd), d) + tf.pow(gamma_sqrd / (4 + gamma_sqrd),
+                                                                           d / 2) - 2 * tf.pow(
+            tf.square(gamma_sqrd) / ((1 + gamma_sqrd) * (3 + gamma_sqrd)), d / 2)) / (n * (n - 1))
+
+        return stat / tf.sqrt(var_g_d_n)
