@@ -179,6 +179,12 @@ _baseline_studies = {
     for s in _sweep_baseline
 }
 
+_sweep_wae = h.product((_datasets, ))
+_wae_studies = {
+    f"{s['dataset']}_wae": sparsity_study.WAEStudy(**s)
+    for s in _sweep_wae
+}
+
 STUDIES = {
     "unsupervised_study_v1": unsupervised_study_v1.UnsupervisedStudyV1(),
     "abstract_reasoning_study_v1":
@@ -186,7 +192,6 @@ STUDIES = {
     "fairness_study_v1":
         fairness_study_v1.FairnessStudyV1(),
     "test": tests.TestStudy(),
-    'wae': sparsity_study.WAEStudy(dataset='dsprites_full'),
     **_dim_wise_studies,
     **_dim_wise_mask_studies,
     **_dim_wise_mask_studies_2,
@@ -210,4 +215,6 @@ STUDIES = {
     **_weight_decay_studies,
     **_small_studies,
     **_baseline_studies,
+
+    **_wae_studies,
 }
