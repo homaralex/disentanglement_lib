@@ -675,4 +675,4 @@ class WAE(BetaVAE):
                                                                            d / 2) - 2 * tf.pow(
             tf.square(gamma_sqrd) / ((1 + gamma_sqrd) * (3 + gamma_sqrd)), d / 2)) / (n * (n - 1))
 
-        return stat / tf.sqrt(var_g_d_n)
+        return stat / tf.sqrt(var_g_d_n) * self.beta
