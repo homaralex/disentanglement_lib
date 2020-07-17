@@ -179,9 +179,10 @@ _baseline_studies = {
     for s in _sweep_baseline
 }
 
-_sweep_wae = h.product((_datasets, ))
+_code_norm = h.sweep('code_norm', (True, False))
+_sweep_wae = h.product((_datasets, _code_norm))
 _wae_studies = {
-    f"{s['dataset']}_wae": sparsity_study.WAEStudy(**s)
+    f"{s['dataset']}_wae{'_norm' if s['code_norm'] else ''}": sparsity_study.WAEStudy(**s)
     for s in _sweep_wae
 }
 

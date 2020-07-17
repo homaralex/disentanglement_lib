@@ -370,21 +370,31 @@ class SoftmaxStudy(BaseSparsityStudy):
 
 
 class WAEStudy(BaseSparsityStudy):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, code_norm=False, *args, **kwargs):
         # add a placeholder for beta
         super().__init__(beta=1, *args, **kwargs)
+
+        self.code_norm = code_norm
+
+    @property
+    def _beta_range(self):
+        if self.code_norm:
+            return np.logspace(-5, 1, 6)
+        return np.logspace(-1, 4, 6)
 
     def get_default_models(self):
         model_name = h.fixed("model.name", "wae")
         model_fn = h.fixed("model.model", "@wae()")
         scale = h.fixed("wae.scale", 1 / 8)
         adaptive = h.fixed("wae.adaptive", True)
-        betas = h.sweep("vae.beta", h.discrete([*np.logspace(-1, 4, 6)]))
+        code_norm = h.fixed("conv_encoder.code_normalization", self.code_norm)
+        betas = h.sweep("vae.beta", h.discrete([*self._beta_range]))
         config_vae = h.zipit([
             model_name,
             model_fn,
             scale,
             adaptive,
+            code_norm,
             betas,
         ])
 

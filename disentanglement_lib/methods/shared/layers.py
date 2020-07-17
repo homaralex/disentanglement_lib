@@ -568,3 +568,56 @@ def softmax_dense(
         scale_temperature=scale_temperature,
     )
     return layer.apply(inputs)
+
+
+class CodeNorm(tf.keras.layers.Layer):
+    def __init__(
+            self,
+            num_latent,
+            training_phase,
+            ema_decay=.9,
+    ):
+        super().__init__()
+
+        self.num_latent = num_latent
+        self.training_phase = training_phase
+        self.ema_decay = ema_decay
+
+    def build(self, input_shape):
+        self.ema_mean = self.add_weight(
+            name='ema_mean',
+            shape=(self.num_latent,),
+            initializer=init_ops.Zeros(),
+            trainable=False,
+            dtype=tf.float32,
+        )
+        self.ema_var = self.add_weight(
+            name='ema_var',
+            shape=(self.num_latent,),
+            initializer=init_ops.Zeros(),
+            trainable=False,
+            dtype=tf.float32,
+        )
+
+    def call(self, means, logvar):
+        var = tf.exp(logvar)
+
+        if self.training_phase:
+            norm_means = tf.reduce_mean(means, axis=0)
+            norm_vars = tf.reduce_mean(tf.square(means) + tf.square(var), axis=0) - tf.square(norm_means)
+
+            ema_mu = self.ema_decay * self.ema_mean + (1 - self.ema_decay) * self.ema_mean
+            tf.assign(self.ema_mean, ema_mu)
+
+            ema_var = self.ema_decay * self.ema_var + (1 - self.ema_decay) * self.ema_var
+            tf.assign(self.ema_var, ema_var)
+
+            means = (means - norm_means) / (tf.square(norm_vars) + _EPS)
+            var = var / (norm_vars + _EPS)
+        else:
+            means = (means - self.ema_mean) / (tf.square(self.ema_var) + _EPS)
+            var = var / (self.ema_var + _EPS)
+
+        logvar = tf.log(var)
+
+        return means, logvar

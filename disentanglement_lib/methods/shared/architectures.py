@@ -22,7 +22,7 @@ import tensorflow as tf
 import gin.tf
 
 from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d, vd_dense, softmax_dense, \
-    softmax_conv2d
+    softmax_conv2d, CodeNorm
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -155,6 +155,7 @@ def conv_encoder(
         softmax_layers=False,
         softmax_temperature=1.,
         scale_temperature=False,
+        code_normalization=False,
         is_training=True,
 ):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
@@ -253,6 +254,9 @@ def conv_encoder(
     e5 = dense(flat_e4, 256, activation=tf.nn.relu, name="e5")
     means = dense(e5, num_latent, activation=None, name="means")
     log_var = dense(e5, num_latent, activation=None, name="log_var")
+
+    if code_normalization:
+        means, log_var = CodeNorm(num_latent=num_latent, training_phase=is_training)(means, log_var)
 
     return means, log_var
 
