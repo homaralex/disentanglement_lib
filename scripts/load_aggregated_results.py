@@ -19,12 +19,12 @@ pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
 DIS_METRICS = (
-    # 'beta_vae_sklearn',
-    # 'factor_vae_metric',
-    # 'evaluation_results.discrete_mig',
+    'beta_vae_sklearn',
+    'factor_vae_metric',
+    'evaluation_results.discrete_mig',
     'evaluation_results.disentanglement',
     'evaluation_results.modularity_score',
-    # 'evaluation_results.SAP_score',
+    'evaluation_results.SAP_score',
 
     # 'train_results.loss',
     # 'train_results.regularizer',
@@ -33,7 +33,7 @@ DIS_METRICS = (
     'evaluation_results.informativeness_test',
     'evaluation_results.explicitness_score_test',
 
-    'train_results.reconstruction_loss',
+    # 'train_results.reconstruction_loss',
 
     # 'evaluation_results.mutual_info_score',
     # 'evaluation_results.gaussian_total_correlation',
@@ -46,19 +46,20 @@ UNSUP_METRICS = (
 )
 DATASETS = (
     'dsprites_full',
-    # 'color_dsprites',
-    # 'noisy_dsprites',
+    'color_dsprites',
+    'noisy_dsprites',
     'scream_dsprites',
-    # 'shapes3d',
-    # 'cars3d',
-    # 'smallnorb',
+    'shapes3d',
+    'cars3d',
+    'smallnorb',
 )
 METHODS = (
     # 'masked',
     # 'dim_wise_mask_l1_col',
     # 'dim_wise_mask_l1',
     'vd_vae',
-    'softmax_vae',
+    # 'softmax_vae',
+    # 'wae',
     # 'proximal_vae',
 
     # 'small_vae',
@@ -137,7 +138,7 @@ def get_reg_col_name(method):
         return 'train_config.conv_encoder.perc_sparse'
     elif 'dim_wise' in method:
         return 'train_config.dim_wise_l1_vae.lmbd_l1'
-    elif 'beta_vae' in method:
+    elif 'beta_vae' in method or 'wae' in method:
         return 'train_config.vae.beta'
     elif 'weight_decay' in method:
         return 'train_config.dim_wise_l1_vae.lmbd_l2'
@@ -150,6 +151,15 @@ def get_reg_col_name(method):
     elif 'softmax' in method:
         return 'train_config.conv_encoder.softmax_temperature'
     raise ValueError(method)
+
+
+def get_scale_col_name(method):
+    if 'softmax' in method:
+        return 'train_config.conv_encoder.scale_temperature'
+    if 'vd' in method:
+        return 'train_config.vd_vae.scale_per_layer'
+    else:
+        return 'train_config.dim_wise_l1_vae.scale_per_layer'
 
 
 def plot_results(
@@ -174,7 +184,7 @@ def plot_results(
         metric_df = metric_df.sort_values(reg_weight_col)
 
         sns.violinplot(
-            x=MODEL_COL_STR,
+            x=reg_weight_col,
             y=metric,
             data=metric_df,
             cut=0,
@@ -184,7 +194,7 @@ def plot_results(
             tick.set_rotation(45)
 
         sns.boxplot(
-            x=MODEL_COL_STR,
+            x=reg_weight_col,
             y=metric,
             data=metric_df,
             ax=ax_box,
@@ -331,7 +341,7 @@ def plot_fig_15(df, methods=METHODS):
                 ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[dataset]
             ax.set(**ax_kwargs)
 
-    axes[0, 2].legend(loc='upper center', bbox_to_anchor=(1.5, 1.2), ncol=len(methods) + 2)
+    axes[0, 2].legend(loc='upper center', bbox_to_anchor=(1.5, 1.6), ncol=len(methods) + 2)
 
     plt.savefig(PLOT_DIR / 'fig_15.png')
     plt.show()
@@ -452,7 +462,8 @@ def plot_fig_17(df, methods=METHODS):
                 ax_kwargs['title'] = HUMAN_READABLE_NAMES[metric]
             if col_idx == len(DIS_METRICS) - 1:
                 ax.yaxis.set_label_position('right')
-                ax_kwargs['ylabel'] = HUMAN_READABLE_NAMES[method]
+                # TODO change to human readable
+                ax_kwargs['ylabel'] = method  # HUMAN_READABLE_NAMES[method]
 
             ax.set(**ax_kwargs)
 
@@ -483,7 +494,9 @@ def plot_fig_18(df, methods=METHODS):
                 sns.scatterplot(
                     x=dsprites_method_df.values,
                     y=method_df.values,
-                    label=HUMAN_READABLE_NAMES[method],
+                    # label=HUMAN_READABLE_NAMES[method],
+                    # TODO change back to human readable
+                    label=method,
                     s=256,
                     marker=('o' if 'col' in method else ('^' if 'l1' in method else 's')),
                     ax=ax,
@@ -527,11 +540,11 @@ def main():
             # False,
         )),
         h.sweep('scale', (
-            # True,
-            False,
+            True,
+            # False,
         )),
         h.sweep('anneal', (
-            # True,
+            True,
             False,
         )),
     ))
@@ -543,7 +556,7 @@ def main():
                                                            setting[
                                                                'all_layers'], setting['scale'], setting['anneal']
 
-        if 'masked' in method or 'small' in method or 'weight_decay' in method or 'proximal' in method:
+        if 'masked' in method or 'small' in method or 'weight_decay' in method or 'proximal' in method or 'wae' in method or anneal:
             scale = False
 
         out_dir = PLOT_DIR / (method + ('_anneal' if anneal else '') + ('_all' if all_layers else '') + (
@@ -569,8 +582,7 @@ def main():
         idxs_all_layers = (df['train_config.dim_wise_l1_vae.all_layers'] == 'True') | (
                 df['train_config.conv_encoder.all_layers'] == 'True')
         df = df.loc[idxs_all_layers] if all_layers else df.loc[~idxs_all_layers]
-        scale_col = 'vd_vae.scale_per_layer' if 'vd' in method else 'dim_wise_l1_vae.scale_per_layer'
-        idxs_scale = (df['train_config.' + scale_col] == 'True')
+        idxs_scale = (df[get_scale_col_name(method)] == 'True')
         df = df.loc[idxs_scale] if scale else df.loc[~idxs_scale]
         idxs_anneal = (~df['train_config.vd_vae.anneal_kld_for'].isin(('None', None)))
         df = df.loc[idxs_anneal] if anneal else df.loc[~idxs_anneal]
@@ -617,12 +629,19 @@ def main():
             ).map(str)
             reg_weight_col = 'train_config.conv_encoder.perc_sparse'
             df[reg_weight_col] = pd.to_numeric(df[reg_weight_col])
+        # TODO use get_reg_col_name() fn here
         elif 'vd' in method:
             reg_weight_col = 'train_config.vd_vae.lmbd_kld_vd'
         elif 'proximal' in method:
             reg_weight_col = 'train_config.proximal_vae.lmbd_prox'
         elif 'softmax' in method:
             reg_weight_col = 'train_config.conv_encoder.softmax_temperature'
+        elif 'wae' in method:
+            reg_weight_col = 'train_config.vae.beta'
+            new_reg_weight_col = reg_weight_col.replace('vae', 'wae')
+            df[new_reg_weight_col] = df[reg_weight_col]
+            df[reg_weight_col] = beta
+            reg_weight_col = new_reg_weight_col
         # ablation test methods
         elif 'weight_decay' in method:
             reg_weight_col = 'train_config.dim_wise_l1_vae.lmbd_l2'
@@ -650,13 +669,13 @@ def main():
 
         df[MODEL_COL_STR] = df[MODEL_COL_STR].str.replace("'", '')
 
-        # out_dir.mkdir(exist_ok=True, parents=True)
-        # plot_results(
-        #     df=df,
-        #     dataset=dataset,
-        #     out_dir=out_dir,
-        #     reg_weight_col=reg_weight_col,
-        # )
+        out_dir.mkdir(exist_ok=True, parents=True)
+        plot_results(
+            df=df,
+            dataset=dataset,
+            out_dir=out_dir,
+            reg_weight_col=reg_weight_col,
+        )
 
         df = df.loc[df[reg_weight_col] != 0]
         df_list.append(df)
@@ -673,7 +692,9 @@ def main():
     plot_fig_15(df, methods=model_names)
     # plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_17(df, methods=METHODS[:3] + ('beta_vae',))
+    plot_fig_17(df, methods=[*model_names, 'beta_vae'])
     # plot_fig_18(df, methods=METHODS[:3])
+    plot_fig_18(df, methods=model_names)
 
     # print_rankings(df)
 
