@@ -386,7 +386,7 @@ class WAEStudy(BaseSparsityStudy):
         model_name = h.fixed("model.name", "wae")
         model_fn = h.fixed("model.model", "@wae()")
         scale = h.fixed("wae.scale", 1 / 8)
-        adaptive = h.fixed("wae.adaptive", True)
+        adaptive = h.fixed("wae.adaptive", not self.code_norm)
         code_norm = h.fixed("conv_encoder.code_normalization", self.code_norm)
         betas = h.sweep("vae.beta", h.discrete([*self._beta_range]))
         config_vae = h.zipit([
