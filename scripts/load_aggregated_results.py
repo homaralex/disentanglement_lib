@@ -128,7 +128,7 @@ def main():
         )),
         h.sweep('scale', (
             True,
-            False,
+            # False,
         )),
         h.sweep('anneal', (
             True,
@@ -276,7 +276,7 @@ def main():
     df = pd.concat((df, load_dlib_df(), shapes_baseline))
     df = df.loc[df['train_config.vae.beta'] == 16]
 
-    top_k_groups = 3
+    top_k_groups = None
     # plot_fig_15(df, methods=model_names, top_k_groups=top_k_groups)
     # plot_fig_16(df, methods=METHODS[:3] + ('beta_vae',))
     # plot_fig_16(df, methods=[*model_names, 'beta_vae'], top_k_groups=top_k_groups)
@@ -564,6 +564,8 @@ def plot_fig_16(df, methods=METHODS, top_k_groups=None, diff_over_baseline=False
         h = sns.heatmap(
             data=corr_matrix,
             annot=True,
+            vmin=-1,
+            vmax=1,
             cmap=sns.color_palette("coolwarm", 7),
             cbar=False,
             square=True,
@@ -652,7 +654,8 @@ def plot_fig_17(df, methods=METHODS, top_k_groups=None, diff_over_baseline=False
 
         return corr
 
-    mean_corrs = np.zeros((len(methods), len(DIS_METRICS)))
+    # mean_corrs = np.zeros((len(methods), len(DIS_METRICS)))
+    mean_corrs = defaultdict(dict)
     for row_idx, method in enumerate(methods):
         for col_idx, metric in enumerate(DIS_METRICS):
             ax = axes[row_idx, col_idx]
@@ -662,11 +665,15 @@ def plot_fig_17(df, methods=METHODS, top_k_groups=None, diff_over_baseline=False
                 baseline_corr = get_corr_matrix('beta_vae')
                 corr = (corr - baseline_corr) / 2
 
-            mean_corrs[row_idx, col_idx] = np.array(corr).mean()
+            # mean_corrs[row_idx, col_idx] = np.array(corr).mean()
+            mean_corrs[method][metric] = (
+                        np.tril(np.array(corr)).sum() / (len(methods) - 1) / (len(DIS_METRICS) - 1)).round(2)
 
             sns.heatmap(
                 data=corr,
                 annot=True,
+                vmin=-1,
+                vmax=1,
                 cmap=sns.color_palette("coolwarm", 7),
                 cbar=False,
                 xticklabels=(row_idx == len(methods) - 1),
@@ -684,7 +691,8 @@ def plot_fig_17(df, methods=METHODS, top_k_groups=None, diff_over_baseline=False
 
             ax.set(**ax_kwargs)
 
-    print(mean_corrs.T)
+    # print(mean_corrs.T)
+    print(pd.DataFrame(mean_corrs))
 
     plt.savefig(PLOT_DIR / 'fig_17.png')
     plt.show()
