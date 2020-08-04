@@ -653,7 +653,7 @@ class WAE(BetaVAE):
         if self.adaptive:
             norms_z = tf.square(z_mean)
             mean_norms_z = tf.reduce_mean(norms_z)
-            gamma_sqrd = self.scale * mean_norms_z
+            gamma_sqrd = tf.stop_gradient(self.scale * mean_norms_z)
 
         first_term = tf.pow(gamma_sqrd / (2 + gamma_sqrd), d / 2)
 
@@ -675,4 +675,6 @@ class WAE(BetaVAE):
                                                                            d / 2) - 2 * tf.pow(
             tf.square(gamma_sqrd) / ((1 + gamma_sqrd) * (3 + gamma_sqrd)), d / 2)) / (n * (n - 1))
 
-        return stat / tf.sqrt(var_g_d_n) * self.beta
+        reg_loss = stat / tf.sqrt(var_g_d_n)
+
+        return reg_loss * self.beta
