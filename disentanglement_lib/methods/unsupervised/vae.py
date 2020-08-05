@@ -646,7 +646,7 @@ class WAE(BetaVAE):
     def regularizer(self, kl_loss, z_mean, z_logvar, z_sampled):
         del kl_loss
 
-        z_var = tf.square(z_logvar)
+        z_var = tf.exp(z_logvar)
         n, d = z_mean.get_shape().as_list()
 
         gamma_sqrd = self.scale * d

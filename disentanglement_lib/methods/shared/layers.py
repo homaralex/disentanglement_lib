@@ -618,6 +618,6 @@ class CodeNorm(tf.keras.layers.Layer):
             means = (means - self.ema_mean) / (tf.sqrt(self.ema_var) + _EPS)
             var = var / (self.ema_var + _EPS)
 
-        logvar = tf.log(var)
+        logvar = tf.log(var + 1e-17)
 
         return means, logvar
