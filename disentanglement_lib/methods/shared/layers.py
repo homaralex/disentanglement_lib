@@ -606,16 +606,16 @@ class CodeNorm(tf.keras.layers.Layer):
             norm_means = tf.reduce_mean(means, axis=0)
             norm_vars = tf.reduce_mean(tf.square(means) + tf.square(var), axis=0) - tf.square(norm_means)
 
-            ema_mu = self.ema_decay * self.ema_mean + (1 - self.ema_decay) * self.ema_mean
+            ema_mu = self.ema_decay * self.ema_mean + (1 - self.ema_decay) * norm_means
             tf.assign(self.ema_mean, ema_mu)
 
-            ema_var = self.ema_decay * self.ema_var + (1 - self.ema_decay) * self.ema_var
+            ema_var = self.ema_decay * self.ema_var + (1 - self.ema_decay) * norm_vars
             tf.assign(self.ema_var, ema_var)
 
-            means = (means - norm_means) / (tf.square(norm_vars) + _EPS)
+            means = (means - norm_means) / (tf.sqrt(norm_vars) + _EPS)
             var = var / (norm_vars + _EPS)
         else:
-            means = (means - self.ema_mean) / (tf.square(self.ema_var) + _EPS)
+            means = (means - self.ema_mean) / (tf.sqrt(self.ema_var) + _EPS)
             var = var / (self.ema_var + _EPS)
 
         logvar = tf.log(var)
