@@ -658,8 +658,13 @@ class WAE(BetaVAE):
         first_term = tf.pow(gamma_sqrd / (2 + gamma_sqrd), d / 2)
 
         second_term = tf.sqrt(gamma_sqrd / (1 + gamma_sqrd + z_var))
-        second_term = second_term * tf.exp(-tf.square(z_mean) / (2 * (1 + gamma_sqrd + z_var)))
-        second_term = tf.reduce_sum(tf.reduce_prod(second_term, axis=1), axis=0)
+        second_term = tf.reduce_sum(
+            tf.reduce_prod(second_term, axis=1) * tf.exp(
+                # replace the product of exponentials with an exponential of the sum of exponents
+                # this should be stabler computationally
+                tf.reduce_sum(-tf.square(z_mean) / (2 * (1 + gamma_sqrd + z_var)), axis=1)),
+            axis=0,
+        )
         second_term = -2 * second_term / n
 
         sum_vars = pdist(z_var, - z_var)
