@@ -672,8 +672,13 @@ class WAE(BetaVAE):
         sum_vars = pdist(z_var, - z_var)
         third_term = tf.sqrt(gamma_sqrd / (gamma_sqrd + sum_vars))
         diffs_mu = pdist(z_mean, z_mean)
-        third_term = third_term * tf.exp(-tf.square(diffs_mu) / (2 * (gamma_sqrd + sum_vars)))
-        third_term = tf.reduce_sum(tf.reduce_prod(third_term, axis=2))
+        # third_term = third_term * tf.exp(-tf.square(diffs_mu) / (2 * (gamma_sqrd + sum_vars)))
+        third_term = tf.reduce_sum(
+            tf.reduce_prod(third_term, axis=2) * tf.exp(
+                # apply the same trick like in the second term
+                tf.reduce_sum(-tf.square(diffs_mu) / (2 * (gamma_sqrd + sum_vars)), axis=2)
+            ),
+        )
         third_term = third_term / n / n
 
         stat = first_term + second_term + third_term
