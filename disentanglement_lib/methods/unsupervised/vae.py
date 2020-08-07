@@ -647,11 +647,12 @@ class WAE(BetaVAE):
         del kl_loss
 
         z_var = tf.exp(z_logvar)
+
         n, d = z_mean.get_shape().as_list()
 
         gamma_sqrd = self.scale * d
         if self.adaptive:
-            norms_z = tf.square(z_mean)
+            norms_z = tf.square(z_sampled)
             mean_norms_z = tf.reduce_mean(norms_z)
             gamma_sqrd = tf.stop_gradient(self.scale * mean_norms_z)
 
@@ -662,7 +663,8 @@ class WAE(BetaVAE):
             tf.reduce_prod(second_term, axis=1) * tf.exp(
                 # replace the product of exponentials with an exponential of the sum of exponents
                 # this should be stabler computationally
-                tf.reduce_sum(-tf.square(z_mean) / (2 * (1 + gamma_sqrd + z_var)), axis=1)),
+                tf.reduce_sum(-tf.square(z_mean) / (2 * (1 + gamma_sqrd + z_var)), axis=1)
+            ),
             axis=0,
         )
         second_term = -2 * second_term / n
