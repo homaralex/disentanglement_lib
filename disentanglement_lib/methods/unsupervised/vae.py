@@ -681,6 +681,7 @@ class WAE(BetaVAE):
         var_g_d_n = 2 * (tf.pow(gamma_sqrd / (2 + gamma_sqrd), d) + tf.pow(gamma_sqrd / (4 + gamma_sqrd),
                                                                            d / 2) - 2 * tf.pow(
             tf.square(gamma_sqrd) / ((1 + gamma_sqrd) * (3 + gamma_sqrd)), d / 2)) / (n * (n - 1))
+        var_g_d_n = tf.maximum(var_g_d_n, 1e-17)
 
         reg_loss = stat / tf.sqrt(var_g_d_n)
 
