@@ -159,11 +159,11 @@ _variational_studies = {
     for s in _sweep_variational
 }
 
-
 _scale_temperature = h.sweep('scale_temperature', (True, False))
 _sweep_softmax = h.product((_betas, _datasets, _all_layers, _scale_temperature))
 _softmax_studies = {
-    f"{s['dataset']}_softmax_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_temperature'] else ''}b_{s['beta']}": sparsity_study.SoftmaxStudy(**s)
+    f"{s['dataset']}_softmax_{'all_' if s['all_layers'] else ''}{'scale_' if s['scale_temperature'] else ''}b_{s['beta']}": sparsity_study.SoftmaxStudy(
+        **s)
     for s in _sweep_softmax
 }
 
@@ -177,6 +177,12 @@ _sweep_baseline = h.product((_betas, _datasets))
 _baseline_studies = {
     f"{s['dataset']}_baseline_b_{s['beta']}": sparsity_study.BaselineSparsityStudy(**s)
     for s in _sweep_baseline
+}
+
+_sweep_dropout = h.product((_betas, _datasets, _all_layers))
+_dropout_studies = {
+    f"{s['dataset']}_dropout_{'all_' if s['all_layers'] else ''}b_{s['beta']}": sparsity_study.DropoutStudy(**s)
+    for s in _sweep_dropout
 }
 
 _code_norm = h.sweep('code_norm', (True, False))
@@ -215,6 +221,7 @@ STUDIES = {
     **_softmax_studies,
     **_weight_decay_studies,
     **_small_studies,
+    **_dropout_studies,
     **_baseline_studies,
 
     **_wae_studies,

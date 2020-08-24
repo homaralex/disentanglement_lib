@@ -22,7 +22,7 @@ import tensorflow as tf
 import gin.tf
 
 from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d, vd_dense, softmax_dense, \
-    softmax_conv2d, CodeNorm
+    softmax_conv2d, CodeNorm, dropout_conv2d, dropout_dense
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -156,6 +156,7 @@ def conv_encoder(
         softmax_temperature=1.,
         scale_temperature=False,
         code_normalization=False,
+        perc_dropout=None,
         is_training=True,
 ):
     """Convolutional encoder used in beta-VAE paper for the chairs data.
@@ -193,6 +194,10 @@ def conv_encoder(
                 kwargs['temperature'] = softmax_temperature
                 kwargs['scale_temperature'] = scale_temperature
                 conv_fn = softmax_conv2d
+            elif perc_dropout is not None:
+                kwargs['rate'] = perc_dropout
+                kwargs['training_phase'] = is_training
+                conv_fn = dropout_conv2d
 
         return conv_fn(*args, **kwargs)
 
@@ -210,6 +215,10 @@ def conv_encoder(
                 kwargs['temperature'] = softmax_temperature
                 kwargs['scale_temperature'] = scale_temperature
                 dense_fn = softmax_dense
+            elif perc_dropout is not None:
+                kwargs['rate'] = perc_dropout
+                kwargs['training_phase'] = is_training
+                dense_fn = dropout_dense
 
         return dense_fn(*args, **kwargs)
 
@@ -251,9 +260,15 @@ def conv_encoder(
         name="e4",
     )
     flat_e4 = tf.layers.flatten(e4)
-    e5 = dense(flat_e4, 256, activation=tf.nn.relu, name="e5")
-    means = dense(e5, num_latent, activation=None, name="means")
-    log_var = dense(e5, num_latent, activation=None, name="log_var")
+    e5 = dense(inputs=flat_e4, units=256, activation=tf.nn.relu, name="e5")
+
+    if perc_dropout is not None:
+        # since we are branching out at this level make sure the same dropout is applied for both branches
+        e5 = tf.layers.dropout(inputs=e5, rate=perc_dropout, training=is_training)
+        perc_dropout = None
+
+    means = dense(inputs=e5, units=num_latent, activation=None, name="means")
+    log_var = dense(inputs=e5, units=num_latent, activation=None, name="log_var")
 
     if code_normalization:
         means, log_var = CodeNorm(num_latent=num_latent, training_phase=is_training)(means, log_var)

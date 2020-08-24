@@ -369,6 +369,35 @@ class SoftmaxStudy(BaseSparsityStudy):
         return all_models
 
 
+class DropoutStudy(BaseSparsityStudy):
+    def __init__(
+            self,
+            all_layers=True,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.all_layers = all_layers
+
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "dropout_vae")
+        model_fn = h.fixed("model.model", "@vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        all_layers = h.fixed('conv_encoder.all_layers', self.all_layers)
+        perc_dropout = h.sweep("conv_encoder.perc_dropout", h.discrete(1 - np.linspace(.1, 1, 6, endpoint=False)))
+        config_vae = h.zipit([
+            model_name,
+            beta,
+            perc_dropout,
+            all_layers,
+            model_fn,
+        ])
+
+        all_models = h.chainit([config_vae, ])
+
+        return all_models
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, code_norm=False, *args, **kwargs):
         # add a placeholder for beta
