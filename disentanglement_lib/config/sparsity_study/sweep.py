@@ -398,6 +398,7 @@ class DropoutStudy(BaseSparsityStudy):
 
         return all_models
 
+
 class WAEStudy(BaseSparsityStudy):
     def __init__(self, code_norm=False, *args, **kwargs):
         # add a placeholder for beta

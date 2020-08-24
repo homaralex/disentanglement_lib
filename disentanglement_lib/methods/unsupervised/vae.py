@@ -647,13 +647,14 @@ class WAE(BetaVAE):
         del kl_loss
 
         z_var = tf.exp(z_logvar)
+        z_var += 1e-16
 
         n, d = z_mean.get_shape().as_list()
 
         gamma_sqrd = self.scale * d
         if self.adaptive:
             norms_z = tf.square(z_sampled)
-            mean_norms_z = tf.reduce_mean(norms_z)
+            mean_norms_z = tf.reduce_mean(tf.reduce_sum(norms_z, axis=1))
             gamma_sqrd = tf.stop_gradient(self.scale * mean_norms_z)
 
         first_term = tf.pow(gamma_sqrd / (2 + gamma_sqrd), d / 2)
