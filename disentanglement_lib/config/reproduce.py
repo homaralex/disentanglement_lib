@@ -185,6 +185,12 @@ _dropout_studies = {
     for s in _sweep_dropout
 }
 
+_sweep_greedy = h.product((_betas, _datasets))
+_greedy_studies = {
+    f"{s['dataset']}_greedy_b_{s['beta']}": sparsity_study.GreedyStudy(**s)
+    for s in _sweep_greedy
+}
+
 _code_norm = h.sweep('code_norm', (True, False))
 _sweep_wae = h.product((_datasets, _code_norm))
 _wae_studies = {
@@ -222,6 +228,7 @@ STUDIES = {
     **_weight_decay_studies,
     **_small_studies,
     **_dropout_studies,
+    **_greedy_studies,
     **_baseline_studies,
 
     **_wae_studies,

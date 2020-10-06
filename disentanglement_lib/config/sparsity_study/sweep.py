@@ -431,3 +431,20 @@ class WAEStudy(BaseSparsityStudy):
         all_models = h.chainit([config_vae, ])
 
         return all_models
+
+
+class GreedyStudy(BaseSparsityStudy):
+    def get_default_models(self):
+        model_name = h.fixed("model.name", "greedy_vae")
+        model_fn = h.fixed("model.model", "@greedy_vae()")
+        beta = h.fixed('vae.beta', self.beta)
+        # TODO other parameters
+        config_greedy = h.zipit([
+            model_name,
+            beta,
+            model_fn,
+        ])
+
+        all_models = h.chainit([config_greedy, ])
+
+        return all_models

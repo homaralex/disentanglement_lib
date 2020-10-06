@@ -21,6 +21,8 @@ representations.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import collections
 import math
 from disentanglement_lib.methods.shared import architectures  # pylint: disable=unused-import
 from disentanglement_lib.methods.shared import losses  # pylint: disable=unused-import
@@ -30,6 +32,7 @@ from six.moves import range
 from six.moves import zip
 import tensorflow as tf
 import gin.tf
+import numpy as np
 
 
 class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
@@ -40,6 +43,9 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
 
     def get_additional_logging(self):
         return {}
+
+    def get_additional_training_hooks(self):
+        return []
 
     def model_fn(self, features, labels, mode, params):
         """TPUEstimator compatible model function."""
@@ -82,14 +88,15 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
                 mode=mode,
                 loss=loss,
                 train_op=train_op,
-                training_hooks=[logging_hook])
+                training_hooks=[logging_hook, *self.get_additional_training_hooks()])
         elif mode == tf.estimator.ModeKeys.EVAL:
             return tf.contrib.tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=loss,
                 eval_metrics=(make_metric_fn("reconstruction_loss", "elbo",
                                              "regularizer", "kl_loss", *additional_logging.keys()),
-                              [reconstruction_loss, -elbo, regularizer, kl_loss, *additional_logging.values()]))
+                              [reconstruction_loss, -elbo, regularizer, kl_loss, *additional_logging.values()]),
+            )
         else:
             raise NotImplementedError("Eval mode not supported.")
 
@@ -559,6 +566,74 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
             self.proximal_ops.append(weight_tensor.assign(new_weights))
 
         return self.proximal_ops
+
+
+class GreedyHook(tf.train.SessionRunHook):
+    def __init__(
+            self,
+            rec_loss_buffer,
+            rec_improvement_eps,
+    ):
+        self.rec_loss_buffer = rec_loss_buffer
+        self.rec_loss_history = collections.deque([], 2 * self.rec_loss_buffer)
+        self.rec_improvement_eps = rec_improvement_eps
+
+        self.current_unlocked = 0
+        # TODO get from gin
+        self.num_latent = 10
+
+    @property
+    def current_mask(self):
+        mask = [1.] * self.current_unlocked + [0.] * (self.num_latent - self.current_unlocked)
+        return np.array(mask)
+
+    def before_run(self, run_context):
+        return tf.train.SessionRunArgs(
+            fetches=[],
+            feed_dict={'encoder/greedy_mask_placeholder:0': self.current_mask},
+        )
+
+    def after_run(
+            self,
+            run_context,  # pylint: disable=unused-argument
+            run_values,
+    ):
+        if self.mode == tf.estimator.ModeKeys.TRAIN:
+            # TODO query actual loss value
+            self.rec_loss_history.appendleft(1)
+
+            if len(self.rec_loss_history) == 2 * self.rec_loss_buffer:
+                nd_rec_loss_history = np.array(self.rec_loss_history)
+                curr_mean = nd_rec_loss_history[:self.rec_loss_buffer].mean()
+                prev_mean = nd_rec_loss_history[self.rec_loss_buffer:].mean()
+                means_diff = (prev_mean - curr_mean) / prev_mean
+                no_improvement = means_diff < self.rec_improvement_eps
+                if no_improvement:
+                    self.rec_loss_history.clear()
+                    if self.current_unlocked < self.num_latent:
+                        self.current_unlocked += 1
+
+
+@gin.configurable('greedy_vae')
+class GreedyVAE(BetaVAE):
+    def __init__(
+            self,
+            rec_loss_buffer=2,
+            rec_improvement_eps=.1,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.rec_loss_buffer = rec_loss_buffer
+        self.rec_improvement_eps = rec_improvement_eps
+
+    def get_additional_training_hooks(self):
+        return [
+            GreedyHook(
+                rec_loss_buffer=self.rec_loss_buffer,
+                rec_improvement_eps=self.rec_improvement_eps,
+            )]
 
 
 @gin.configurable('vd_vae')
