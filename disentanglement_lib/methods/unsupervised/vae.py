@@ -57,12 +57,14 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         reconstructions = self.decode(z_sampled, data_shape, is_training)
         per_sample_loss = losses.make_reconstruction_loss(features, reconstructions)
         reconstruction_loss = tf.reduce_mean(per_sample_loss)
-        self._rec_loss_ref = reconstruction_loss
         kl_loss = compute_gaussian_kl(z_mean, z_logvar)
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
         loss = tf.add(reconstruction_loss, regularizer, name="loss")
         elbo = tf.add(reconstruction_loss, kl_loss, name="elbo")
         additional_logging = self.get_additional_logging()
+
+        self._rec_loss_ref = reconstruction_loss
+        self._num_latent = int(z_mean.shape[1])
 
         if mode == tf.estimator.ModeKeys.TRAIN:
             optimizer = optimizers.make_vae_optimizer()
@@ -572,18 +574,19 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
 class GreedyHook(tf.train.SessionRunHook):
     def __init__(
             self,
+            num_latent,
             rec_loss_ref,
             rec_loss_buffer,
             rec_improvement_eps,
     ):
+        self.num_latent = num_latent
+
         self.rec_loss_ref = rec_loss_ref
         self.rec_loss_buffer = rec_loss_buffer
         self.rec_loss_history = collections.deque([], 2 * self.rec_loss_buffer)
         self.rec_improvement_eps = rec_improvement_eps
 
         self.current_unlocked = 0
-        # TODO get from gin
-        self.num_latent = 10
 
     @property
     def current_mask(self):
@@ -621,9 +624,8 @@ class GreedyHook(tf.train.SessionRunHook):
 class GreedyVAE(BetaVAE):
     def __init__(
             self,
-            # TODO change default values
-            rec_loss_buffer=2,
-            rec_improvement_eps=.1,
+            rec_loss_buffer,
+            rec_improvement_eps,
             *args,
             **kwargs,
     ):
@@ -635,6 +637,7 @@ class GreedyVAE(BetaVAE):
     def get_additional_training_hooks(self):
         return [
             GreedyHook(
+                num_latent=self._num_latent,
                 rec_loss_ref=self._rec_loss_ref,
                 rec_loss_buffer=self.rec_loss_buffer,
                 rec_improvement_eps=self.rec_improvement_eps,
