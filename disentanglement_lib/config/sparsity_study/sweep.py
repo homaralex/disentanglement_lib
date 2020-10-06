@@ -438,11 +438,18 @@ class GreedyStudy(BaseSparsityStudy):
         model_name = h.fixed("model.name", "greedy_vae")
         model_fn = h.fixed("model.model", "@greedy_vae()")
         beta = h.fixed('vae.beta', self.beta)
-        # TODO other parameters
+
+        rec_loss_buffer = h.sweep('greedy_vae.rec_loss_buffer', h.discrete((500, 5000)))
+        rec_improvement_eps = h.sweep('greedy_vae.rec_improvement_eps', h.discrete(np.logspace(-4, -2, 3)))
+
         config_greedy = h.zipit([
             model_name,
             beta,
             model_fn,
+            h.product([
+                rec_loss_buffer,
+                rec_improvement_eps,
+            ]),
         ])
 
         all_models = h.chainit([config_greedy, ])

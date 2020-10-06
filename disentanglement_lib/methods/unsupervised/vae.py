@@ -621,6 +621,7 @@ class GreedyHook(tf.train.SessionRunHook):
 class GreedyVAE(BetaVAE):
     def __init__(
             self,
+            # TODO change default values
             rec_loss_buffer=2,
             rec_improvement_eps=.1,
             *args,
