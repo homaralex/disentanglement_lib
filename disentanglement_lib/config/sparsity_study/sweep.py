@@ -439,6 +439,7 @@ class GreedyStudy(BaseSparsityStudy):
         model_fn = h.fixed("model.model", "@greedy_vae()")
         beta = h.fixed('vae.beta', self.beta)
 
+        use_greedy_mask = h.fixed('conv_encoder.use_greedy_mask', True)
         rec_loss_buffer = h.sweep('greedy_vae.rec_loss_buffer', h.discrete((500, 5000)))
         rec_improvement_eps = h.sweep('greedy_vae.rec_improvement_eps', h.discrete(np.logspace(-4, -2, 3)))
 
@@ -446,6 +447,7 @@ class GreedyStudy(BaseSparsityStudy):
             model_name,
             beta,
             model_fn,
+            use_greedy_mask,
             h.product([
                 rec_loss_buffer,
                 rec_improvement_eps,

@@ -22,7 +22,7 @@ import tensorflow as tf
 import gin.tf
 
 from disentanglement_lib.methods.shared.layers import masked_conv2d, masked_dense, vd_conv2d, vd_dense, softmax_dense, \
-    softmax_conv2d, CodeNorm, dropout_conv2d, dropout_dense
+    softmax_conv2d, CodeNorm, dropout_conv2d, dropout_dense, make_greedy_mask
 
 
 @gin.configurable("encoder", whitelist=["num_latent", "encoder_fn"])
@@ -156,6 +156,7 @@ def conv_encoder(
         softmax_temperature=1.,
         scale_temperature=False,
         code_normalization=False,
+        use_greedy_mask=False,
         perc_dropout=None,
         is_training=True,
 ):
@@ -273,34 +274,8 @@ def conv_encoder(
     if code_normalization:
         means, log_var = CodeNorm(num_latent=num_latent, training_phase=is_training)(means, log_var)
 
-    # TODO actual if statement
-    if True:
-        def mask_init():
-            return [0.] * int(means.shape[1])
-
-        # This a bit tricky since dynamic execution is a pain in tf1
-        # We have two non-trainable variables - a placeholder and the actual mask.
-        # The placeholder is used for communication with the outer "non-tf" world - the greedy agent can control
-        # its values via feed_dict.
-        # The actual mask tensor however is used for the model automatically store its last value - e.g., when loading
-        # for evaluation after training is finished.
-        # During training the outer non-tf agent passes the current mask value via feed_dict - if the passed mask is
-        # "wider" than the last used one, values in 'greedy_mask' tensor will be updated with 'greedy_mask_placeholder'.
-        mask_placeholder = tf.Variable(initial_value=mask_init(), name='greedy_mask_placeholder', trainable=False)
-        mask = tf.Variable(initial_value=mask_init(), name='greedy_mask', trainable=False)
-
-        # we compare if the placeholder has more non-zero values (and thus a greater sum of elements)
-        # based on that we return either the placeholder's or the current mask value
-        mask_to_assign = tf.cond(
-            pred=tf.less(tf.reduce_sum(mask), tf.reduce_sum(mask_placeholder)),
-            true_fn=lambda: tf.identity(mask_placeholder),
-            false_fn=lambda: tf.identity(mask),
-        )
-        # then we update the actual mask tensor either with the placeholder's value or itself
-        mask = tf.assign(ref=mask, value=mask_to_assign)
-
-        # TODO remove print
-        mask = tf.Print(mask, [mask], message='Mask: ', summarize=10)
+    if use_greedy_mask:
+        mask = make_greedy_mask(mask_len=int(means.shape[1]))
         means, log_var = means * mask, log_var * mask
 
     return means, log_var
