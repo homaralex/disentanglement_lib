@@ -57,6 +57,7 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         reconstructions = self.decode(z_sampled, data_shape, is_training)
         per_sample_loss = losses.make_reconstruction_loss(features, reconstructions)
         reconstruction_loss = tf.reduce_mean(per_sample_loss)
+        self._rec_loss_ref = reconstruction_loss
         kl_loss = compute_gaussian_kl(z_mean, z_logvar)
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
         loss = tf.add(reconstruction_loss, regularizer, name="loss")
@@ -571,9 +572,11 @@ class ProximalVAE(BetaVAE, PenalizeWeightsMixin):
 class GreedyHook(tf.train.SessionRunHook):
     def __init__(
             self,
+            rec_loss_ref,
             rec_loss_buffer,
             rec_improvement_eps,
     ):
+        self.rec_loss_ref = rec_loss_ref
         self.rec_loss_buffer = rec_loss_buffer
         self.rec_loss_history = collections.deque([], 2 * self.rec_loss_buffer)
         self.rec_improvement_eps = rec_improvement_eps
@@ -589,7 +592,7 @@ class GreedyHook(tf.train.SessionRunHook):
 
     def before_run(self, run_context):
         return tf.train.SessionRunArgs(
-            fetches=[],
+            fetches={'rec_loss': self.rec_loss_ref},
             feed_dict={'encoder/greedy_mask_placeholder:0': self.current_mask},
         )
 
@@ -598,20 +601,20 @@ class GreedyHook(tf.train.SessionRunHook):
             run_context,  # pylint: disable=unused-argument
             run_values,
     ):
-        if self.mode == tf.estimator.ModeKeys.TRAIN:
-            # TODO query actual loss value
-            self.rec_loss_history.appendleft(1)
+        if self.current_unlocked >= self.num_latent:
+            return
 
-            if len(self.rec_loss_history) == 2 * self.rec_loss_buffer:
-                nd_rec_loss_history = np.array(self.rec_loss_history)
-                curr_mean = nd_rec_loss_history[:self.rec_loss_buffer].mean()
-                prev_mean = nd_rec_loss_history[self.rec_loss_buffer:].mean()
-                means_diff = (prev_mean - curr_mean) / prev_mean
-                no_improvement = means_diff < self.rec_improvement_eps
-                if no_improvement:
-                    self.rec_loss_history.clear()
-                    if self.current_unlocked < self.num_latent:
-                        self.current_unlocked += 1
+        self.rec_loss_history.appendleft(run_values.results['rec_loss'])
+
+        if len(self.rec_loss_history) == 2 * self.rec_loss_buffer:
+            nd_rec_loss_history = np.array(self.rec_loss_history)
+            curr_mean = nd_rec_loss_history[:self.rec_loss_buffer].mean()
+            prev_mean = nd_rec_loss_history[self.rec_loss_buffer:].mean()
+            means_diff = (prev_mean - curr_mean) / prev_mean
+            no_improvement = means_diff < self.rec_improvement_eps
+            if no_improvement:
+                self.rec_loss_history.clear()
+                self.current_unlocked += 1
 
 
 @gin.configurable('greedy_vae')
@@ -631,6 +634,7 @@ class GreedyVAE(BetaVAE):
     def get_additional_training_hooks(self):
         return [
             GreedyHook(
+                rec_loss_ref=self._rec_loss_ref,
                 rec_loss_buffer=self.rec_loss_buffer,
                 rec_improvement_eps=self.rec_improvement_eps,
             )]
