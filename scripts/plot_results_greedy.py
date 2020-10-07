@@ -98,11 +98,11 @@ def plot_violin(df):
         fig, axes = plt.subplots(nrows=len(DIS_METRICS), ncols=1, figsize=(30, 30))
 
         for row_idx, dis_metric in enumerate(DIS_METRICS):
-            df_metric, metric_col_name = get_metric_df(df_dataset, dis_metric)
             ax = axes[row_idx]
+            df_metric, metric_col_name = get_metric_df(df_dataset, dis_metric)
 
             sns.violinplot(
-                x='train_config.model.name',
+                x='group_id',
                 y=metric_col_name,
                 data=df_metric,
                 cut=0,
@@ -118,11 +118,38 @@ def plot_violin(df):
         plt.close(fig)
 
 
+def preprocess(df):
+    def get_model_type(row):
+        for model_type in (
+                'annealed',
+                'greedy',
+                'beta_vae',
+        ):
+            if model_type in row[MODEL_COL_STR]:
+                return model_type
+
+    df['model_type'] = df.apply(lambda row: get_model_type(row), axis=1)
+
+    def get_group_id(row):
+        model_type = row['model_type']
+        if model_type == 'annealed':
+            return f"{model_type}_{row['train_config.annealed_vae.c_max']}"
+        if model_type == 'beta_vae':
+            return f"{model_type}_{row['train_config.vae.beta']}"
+        if model_type == 'greedy':
+            return f"{model_type}_{row['train_config.vae.beta']}_{row['train_config.greedy_vae.rec_improvement_eps']}_{row['train_config.greedy_vae.rec_loss_buffer']}"
+
+    df['group_id'] = df.apply(lambda row: get_group_id(row), axis=1)
+
+    return df
+
+
 def main(result_files):
     df_baseline = load_baseline()
     df_results = load_results(result_files)
 
     df = pd.concat((df_baseline, df_results), sort=True)
+    df = preprocess(df)
 
     plot_violin(df)
 
