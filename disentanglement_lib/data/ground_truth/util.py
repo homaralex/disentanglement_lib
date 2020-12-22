@@ -22,17 +22,27 @@ from six.moves import range
 import tensorflow as tf
 
 
-def tf_data_set_from_ground_truth_data(ground_truth_data, random_seed):
+def tf_data_set_from_ground_truth_data(ground_truth_data, random_seed, batch_size=None):
   """Generate a tf.data.DataSet from ground_truth data."""
 
   def generator():
     # We need to hard code the random seed so that the data set can be reset.
     random_state = np.random.RandomState(random_seed)
+
+    if ground_truth_data.__class__.__name__ == 'Shapes3D':
+      return ground_truth_data.sample_observations(batch_size or 1, random_state)
+
     while True:
-      yield ground_truth_data.sample_observations(1, random_state)[0]
+      ret = ground_truth_data.sample_observations(batch_size or 1, random_state)
+      print(ret.shape, batch_size)
+      yield ret
+      # yield ground_truth_data.sample_observations(1, random_state)[0]
 
   return tf.data.Dataset.from_generator(
-      generator, tf.float32, output_shapes=ground_truth_data.observation_shape)
+      generator, tf.float32,
+    output_shapes=[batch_size, ] + ground_truth_data.observation_shape if ground_truth_data.__class__.__name__ == 'Shapes3D' else ground_truth_data.observation_shape,
+    # output_shapes=ground_truth_data.observation_shape,
+  )
 
 
 class SplitDiscreteStateSpace(object):

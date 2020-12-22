@@ -151,11 +151,12 @@ def _make_input_fn(ground_truth_data, seed, num_batches=None):
 
   def load_dataset(params):
     """TPUEstimator compatible input fuction."""
-    dataset = util.tf_data_set_from_ground_truth_data(ground_truth_data, seed)
     batch_size = params["batch_size"]
+    dataset = util.tf_data_set_from_ground_truth_data(ground_truth_data, seed, batch_size=batch_size)
     # We need to drop the remainder as otherwise we lose the batch size in the
     # tensor shape. This has no effect as our data set is infinite.
-    dataset = dataset.batch(batch_size, drop_remainder=True)
+    # dataset = dataset.batch(1)
+    # dataset = dataset.batch(batch_size, drop_remainder=True)
     if num_batches is not None:
       dataset = dataset.take(num_batches)
     return dataset.make_one_shot_iterator().get_next()
