@@ -47,6 +47,9 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     def get_additional_training_hooks(self):
         return []
 
+    def make_reconstruction_loss(self, features, reconstructions, params):
+        return losses.make_reconstruction_loss(features, reconstructions)
+
     def model_fn(self, features, labels, mode, params):
         """TPUEstimator compatible model function."""
         del labels
@@ -55,7 +58,7 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         z_mean, z_logvar = self.gaussian_encoder(features, is_training=is_training)
         z_sampled = self.sample_from_latent_distribution(z_mean, z_logvar)
         reconstructions = self.decode(z_sampled, data_shape, is_training)
-        per_sample_loss = losses.make_reconstruction_loss(features, reconstructions)
+        per_sample_loss = self.make_reconstruction_loss(features, reconstructions, params)
         reconstruction_loss = tf.reduce_mean(per_sample_loss)
         kl_loss = compute_gaussian_kl(z_mean, z_logvar)
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
@@ -775,3 +778,57 @@ class WAE(BetaVAE):
         reg_loss = stat / tf.sqrt(var_g_d_n)
 
         return reg_loss * self.beta
+
+
+@gin.configurable('hlnpca')
+class HNLPCA(BetaVAE):
+    def __init__(
+            self,
+            balanced,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.balanced = balanced
+
+    def decode(self, latent_tensor, observation_shape, is_training):
+        # only perform this for training - for inference we can use the full encoder -
+        # that is the model with the most dimensions active
+        if is_training:
+            # TODO
+            num_towers = 6
+            num_latents = int(latent_tensor.shape[-1])
+            masked_latents = []
+            for i in range(1, num_towers + 1):
+                mask = [1.] * i + [0.] * (num_latents - i)
+                mask = np.array(mask)
+                masked_latent = latent_tensor * mask
+
+                masked_latents.append(masked_latent)
+
+            masked_latents = tf.concat(masked_latents, axis=0)
+            # TODO remove
+            masked_latents = tf.Print(masked_latents, [masked_latents], message=f'masked_latents: ', summarize=60 * 64)
+            latent_tensor = masked_latents
+
+        return super().decode(
+            latent_tensor=latent_tensor,
+            observation_shape=observation_shape,
+            is_training=is_training,
+        )
+
+    def make_reconstruction_loss(self, features, reconstructions, params):
+        batch_size = params['batch_size']
+        per_sample_loss = 0
+        curr_idx = 0
+        while curr_idx < reconstructions.shape[0]:
+            curr_batch = reconstructions[curr_idx:curr_idx + batch_size]
+            per_sample_loss += super().make_reconstruction_loss(
+                features=features,
+                reconstructions=curr_batch,
+                params=params,
+            )
+            curr_idx += batch_size
+
+        return per_sample_loss

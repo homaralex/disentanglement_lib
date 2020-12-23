@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from disentanglement_lib.config.sparsity_study import sweep as sparsity_study
+from disentanglement_lib.config.greedy_study import sweep as greedy_study
 from disentanglement_lib.config.abstract_reasoning_study_v1.stage1 import sweep as abstract_reasoning_study_v1
 from disentanglement_lib.config.fairness_study_v1 import sweep as fairness_study_v1
 from disentanglement_lib.config.tests import sweep as tests
@@ -191,6 +192,13 @@ _greedy_studies = {
     for s in _sweep_greedy
 }
 
+_balanced_weighing = h.sweep('balanced', (True, False))
+_sweep_hnlpca = h.product((_betas, _datasets, _balanced_weighing))
+_hnlpca_studies = {
+    f"{s['dataset']}_hnlpca{'_balanced' if s['balanced'] else ''}_b_{s['beta']}": greedy_study.HNLPCAStudy(**s)
+    for s in _sweep_hnlpca
+}
+
 _code_norm = h.sweep('code_norm', (True, False))
 _sweep_wae = h.product((_datasets, _code_norm))
 _wae_studies = {
@@ -229,6 +237,8 @@ STUDIES = {
     **_small_studies,
     **_dropout_studies,
     **_greedy_studies,
+    **_hnlpca_studies,
+
     **_baseline_studies,
 
     **_wae_studies,
