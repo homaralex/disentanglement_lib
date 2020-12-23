@@ -803,10 +803,15 @@ class HNLPCA(BetaVAE):
 
         self.balanced = balanced
 
-    def decode(self, latent_tensor, observation_shape, is_training, params=None):
-        # only perform this for training - for inference we can use the full encoder -
-        # that is the model with the most dimensions active
+    def decode(
+            self,
+            latent_tensor,
+            observation_shape,
+            is_training,
+            params=None,
+    ):
         if is_training and params is not None:
+            # during training we replicate the batches and mask them appropriately to simulate the bottleneck
             num_towers = params['dataset_num_factors']
             num_latents = int(latent_tensor.shape[-1])
             masked_latents = []
@@ -818,6 +823,16 @@ class HNLPCA(BetaVAE):
                 masked_latents.append(masked_latent)
 
             masked_latents = tf.concat(masked_latents, axis=0)
+
+            # We fill the unused dimensions (dim_id >= num_towers) with random values.
+            # This is to force the model to ignore them (and ideally set the corresponding weights to zero)
+            # and avoid unexpected behavior when generating random data based on samples from the prior.
+            # If we would leave these values equal to 0 the model would just ignore them and could keep non-zero weights
+            # in the corresponding connections, which could then later be activated by (non-zero) random prior samples.
+            random_fill = tf.random.normal(shape=masked_latents.shape)
+            fill_mask = np.array([0.] * num_towers + [1.] * (num_latents - num_towers))
+            masked_latents += random_fill * fill_mask
+
             latent_tensor = masked_latents
 
         return super().decode(
