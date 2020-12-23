@@ -818,8 +818,6 @@ class HNLPCA(BetaVAE):
                 masked_latents.append(masked_latent)
 
             masked_latents = tf.concat(masked_latents, axis=0)
-            # TODO remove
-            masked_latents = tf.Print(masked_latents, [masked_latents], message=f'masked_latents: ', summarize=60 * 64)
             latent_tensor = masked_latents
 
         return super().decode(
