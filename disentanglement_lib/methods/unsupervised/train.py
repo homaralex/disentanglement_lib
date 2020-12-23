@@ -116,7 +116,10 @@ def train(model_dir,
       model_dir=os.path.join(model_dir, "tf_checkpoint"),
       train_batch_size=batch_size,
       eval_batch_size=batch_size,
-      config=run_config)
+      config=run_config,
+      # pass num_factors via params to be accessible for hnlpca models
+      params={'dataset_num_factors': dataset.num_factors}
+  )
 
   # Set up time to keep track of elapsed time in results.
   experiment_timer = time.time()

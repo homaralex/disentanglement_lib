@@ -47,7 +47,13 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
     def get_additional_training_hooks(self):
         return []
 
-    def make_reconstruction_loss(self, features, reconstructions, params):
+    def make_reconstruction_loss(
+            self,
+            features,
+            reconstructions,
+            is_training,
+            params,
+    ):
         return losses.make_reconstruction_loss(features, reconstructions)
 
     def model_fn(self, features, labels, mode, params):
@@ -57,8 +63,13 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         data_shape = features.get_shape().as_list()[1:]
         z_mean, z_logvar = self.gaussian_encoder(features, is_training=is_training)
         z_sampled = self.sample_from_latent_distribution(z_mean, z_logvar)
-        reconstructions = self.decode(z_sampled, data_shape, is_training)
-        per_sample_loss = self.make_reconstruction_loss(features, reconstructions, params)
+        reconstructions = self.decode(z_sampled, data_shape, is_training, params)
+        per_sample_loss = self.make_reconstruction_loss(
+            features=features,
+            reconstructions=reconstructions,
+            is_training=is_training,
+            params=params,
+        )
         reconstruction_loss = tf.reduce_mean(per_sample_loss)
         kl_loss = compute_gaussian_kl(z_mean, z_logvar)
         regularizer = self.regularizer(kl_loss, z_mean, z_logvar, z_sampled)
@@ -119,7 +130,7 @@ class BaseVAE(gaussian_encoder_model.GaussianEncoderModel):
         return architectures.make_gaussian_encoder(
             input_tensor, is_training=is_training)
 
-    def decode(self, latent_tensor, observation_shape, is_training):
+    def decode(self, latent_tensor, observation_shape, is_training, params=None):
         """Decodes the latent_tensor to an observation."""
         return architectures.make_decoder(
             latent_tensor, observation_shape, is_training=is_training)
@@ -792,12 +803,11 @@ class HNLPCA(BetaVAE):
 
         self.balanced = balanced
 
-    def decode(self, latent_tensor, observation_shape, is_training):
+    def decode(self, latent_tensor, observation_shape, is_training, params=None):
         # only perform this for training - for inference we can use the full encoder -
         # that is the model with the most dimensions active
-        if is_training:
-            # TODO
-            num_towers = 6
+        if is_training and params is not None:
+            num_towers = params['dataset_num_factors']
             num_latents = int(latent_tensor.shape[-1])
             masked_latents = []
             for i in range(1, num_towers + 1):
@@ -816,19 +826,37 @@ class HNLPCA(BetaVAE):
             latent_tensor=latent_tensor,
             observation_shape=observation_shape,
             is_training=is_training,
+            params=params,
         )
 
-    def make_reconstruction_loss(self, features, reconstructions, params):
-        batch_size = params['batch_size']
-        per_sample_loss = 0
-        curr_idx = 0
-        while curr_idx < reconstructions.shape[0]:
-            curr_batch = reconstructions[curr_idx:curr_idx + batch_size]
-            per_sample_loss += super().make_reconstruction_loss(
+    def make_reconstruction_loss(
+            self,
+            features,
+            reconstructions,
+            is_training,
+            params,
+    ):
+        # TODO weighing
+        if is_training and params is not None:
+            batch_size = params['batch_size']
+            num_towers = params['dataset_num_factors']
+            per_sample_loss = 0
+            curr_idx = 0
+            for i in range(num_towers):
+                curr_batch = reconstructions[curr_idx:curr_idx + batch_size]
+                per_sample_loss += super().make_reconstruction_loss(
+                    features=features,
+                    reconstructions=curr_batch,
+                    is_training=is_training,
+                    params=params,
+                )
+                curr_idx += batch_size
+
+            return per_sample_loss
+        else:
+            return super().make_reconstruction_loss(
                 features=features,
-                reconstructions=curr_batch,
+                reconstructions=reconstructions,
+                is_training=is_training,
                 params=params,
             )
-            curr_idx += batch_size
-
-        return per_sample_loss
