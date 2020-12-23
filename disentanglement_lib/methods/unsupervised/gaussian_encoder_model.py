@@ -41,7 +41,7 @@ class GaussianEncoderModel(object):
     """
     raise NotImplementedError()
 
-  def decode(self, latent_tensor, observation_shape, is_training):
+  def decode(self, latent_tensor, observation_shape, is_training, params=None):
     """Decodes the latent_tensor to an observation."""
     raise NotImplementedError()
 
