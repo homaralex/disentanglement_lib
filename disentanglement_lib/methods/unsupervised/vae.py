@@ -834,20 +834,27 @@ class HNLPCA(BetaVAE):
             is_training,
             params,
     ):
-        # TODO weighing
         if is_training and params is not None:
             batch_size = params['batch_size']
             num_towers = params['dataset_num_factors']
             per_sample_loss = 0
             curr_idx = 0
-            for i in range(num_towers):
+            # default weight in non-balanced mode - simply average out each term uniformly
+            weight = 1. / num_towers
+
+            for tower_idx in range(num_towers):
                 curr_batch = reconstructions[curr_idx:curr_idx + batch_size]
+
+                if self.balanced:
+                    normalization_constant = sum(1. / (i + 1) for i in range(num_towers))
+                    weight = 1. / (num_towers - tower_idx) / normalization_constant
+
                 per_sample_loss += super().make_reconstruction_loss(
                     features=features,
                     reconstructions=curr_batch,
                     is_training=is_training,
                     params=params,
-                )
+                ) * weight
                 curr_idx += batch_size
 
             return per_sample_loss
