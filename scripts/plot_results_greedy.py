@@ -8,7 +8,7 @@ from scripts.load_aggregated_results import DATASET_COL_STR, MODEL_COL_STR, RESU
     get_dataset_df, get_metric_df, get_method_df, HUMAN_READABLE_NAMES, PLOT_DIR, get_reg_col_name
 
 _BASELINE_CACHE_FILE = RESULTS_DIR / 'dlib_baseline_cache.json'
-_OUT_DIR = PLOT_DIR / 'greedy'
+_OUT_DIR = PLOT_DIR / 'hnlpca'
 _OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -85,6 +85,7 @@ def plot_fig_15(df):
 
     axes[0, 2].legend(loc='upper center', bbox_to_anchor=(1.5, 1.6), ncol=len(methods) + 2)
 
+    # TODO change from 'greedy'
     plt.savefig(PLOT_DIR / 'greedy_fig_15.png')
     plt.show()
     plt.close(fig)
@@ -122,13 +123,16 @@ def preprocess(df):
     def get_model_type(row):
         for model_type in (
                 'annealed',
-                'greedy',
+                # 'greedy',
+                'hnlpca',
                 'beta_vae',
         ):
             if model_type in row[MODEL_COL_STR]:
                 return model_type
 
     df['model_type'] = df.apply(lambda row: get_model_type(row), axis=1)
+    # filter out the rest of the models
+    df = df.loc[df['model_type'].notna()]
 
     def get_group_id(row):
         model_type = row['model_type']
@@ -138,8 +142,12 @@ def preprocess(df):
             return f"{model_type}_{row['train_config.vae.beta']}"
         if model_type == 'greedy':
             return f"{model_type}_{row['train_config.vae.beta']}_{row['train_config.greedy_vae.rec_improvement_eps']}_{row['train_config.greedy_vae.rec_loss_buffer']}"
+        if model_type == 'hnlpca':
+            return f"{model_type}{'_balanced' if row['train_config.hlnpca.balanced'] == 'True' else ''}"
 
     df['group_id'] = df.apply(lambda row: get_group_id(row), axis=1)
+
+    df.sort_values(by=['model_type', 'group_id'], inplace=True)
 
     return df
 
