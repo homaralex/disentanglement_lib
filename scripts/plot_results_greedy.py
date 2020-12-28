@@ -152,6 +152,58 @@ def preprocess(df):
     return df
 
 
+def print_tables(df):
+    # TODO group by model_name
+    with open(_OUT_DIR / 'test.html', 'w') as out_file:
+        def f_print(s):
+            print(s, file=out_file)
+
+        f_print('''<!DOCTYPE html>
+<html>
+<head>
+<style>
+table, th, td {
+  border: 1px solid black;
+}
+</style>
+</head>
+<body>''')
+        for dataset in DATASETS:
+            f_print(f'<p>{dataset}</p>\n')
+
+            df_dataset = get_dataset_df(df, dataset)
+            f_print('<table>')
+            f_print('<tr>')
+            f_print('<td></td>')
+            for group_id in df_dataset['group_id'].unique():
+                f_print(f'<th>{group_id}</th>')
+            f_print('</tr>')
+            for row_idx, dis_metric in enumerate(DIS_METRICS):
+                # f_print('<tr>')
+                # f_print(dis_metric)
+                # f_print('</tr>')
+
+                df_metric, metric_col_name = get_metric_df(df_dataset, dis_metric)
+                df_grouped = df_metric.groupby('group_id')[metric_col_name].mean()
+
+                # f_print('<tr>')
+                # for group_id in df_grouped.index:
+                #     f_print(f'<td>{group_id}</td>')
+                # f_print('</tr>')
+
+                f_print('<tr>')
+                f_print(f'<td>{dis_metric.split(".")[-1]}</td>')
+                for result in df_grouped:
+                    f_print(f'<td>{round(result, 4)}</td>')
+                f_print('</tr>')
+
+            f_print('</table>')
+        f_print('''
+</body>
+</html>
+''')
+
+
 def main(result_files):
     df_baseline = load_baseline()
     df_results = load_results(result_files)
@@ -159,7 +211,8 @@ def main(result_files):
     df = pd.concat((df_baseline, df_results), sort=True)
     df = preprocess(df)
 
-    plot_violin(df)
+    # plot_violin(df)
+    print_tables(df)
 
 
 if __name__ == '__main__':
