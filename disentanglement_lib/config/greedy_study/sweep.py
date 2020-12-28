@@ -13,6 +13,11 @@ class HNLPCAStudy(BaseSparsityStudy):
 
         self.balanced = balanced
 
+    def get_seeds(self, num):
+        if num != 50:
+            print('Warning: HNLPCAStudy has a hardcoded value of 50 random runs.')
+        return super().get_seeds(50)
+
     def get_default_models(self):
         model_name = h.fixed("model.name", "hnlpca")
         model_fn = h.fixed("model.model", "@hlnpca()")
