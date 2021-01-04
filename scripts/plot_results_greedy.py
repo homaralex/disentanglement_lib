@@ -8,8 +8,6 @@ from scripts.load_aggregated_results import DATASET_COL_STR, MODEL_COL_STR, RESU
     get_dataset_df, get_metric_df, get_method_df, HUMAN_READABLE_NAMES, PLOT_DIR, get_reg_col_name
 
 _BASELINE_CACHE_FILE = RESULTS_DIR / 'dlib_baseline_cache.json'
-_OUT_DIR = PLOT_DIR / 'hnlpca'
-_OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_baseline():
@@ -91,7 +89,7 @@ def plot_fig_15(df):
     plt.close(fig)
 
 
-def plot_violin(df):
+def plot_violin(df, out_dir):
     for dataset in DATASETS:
         print(dataset)
 
@@ -115,21 +113,21 @@ def plot_violin(df):
                 tick.set_rotation(25)
 
         fig.suptitle(dataset)
-        fig.savefig(_OUT_DIR / f'{dataset}_violin.png')
+        fig.savefig(out_dir / f'{dataset}_violin.png')
         plt.close(fig)
 
 
-def preprocess(df):
+def preprocess(df, model_to_compare):
     def get_model_type(row):
         for model_type in (
+                model_to_compare,
                 'annealed',
-                # 'greedy',
-                'hnlpca',
                 'beta_vae',
         ):
             if model_type in row[MODEL_COL_STR]:
                 return model_type
 
+    df = df.loc[(df['train_config.vae.beta'] == 1) | df[MODEL_COL_STR].str.contains('annealed')]
     df['model_type'] = df.apply(lambda row: get_model_type(row), axis=1)
     # filter out the rest of the models
     df = df.loc[df['model_type'].notna()]
@@ -152,9 +150,8 @@ def preprocess(df):
     return df
 
 
-def print_tables(df):
-    # TODO group by model_name
-    with open(_OUT_DIR / 'test.html', 'w') as out_file:
+def print_tables(df, model_to_compare, out_dir):
+    with open(out_dir / 'results.html', 'w') as out_file:
         def f_print(s):
             print(s, file=out_file)
 
@@ -169,9 +166,11 @@ table, th, td {
 </head>
 <body>''')
         for dataset in DATASETS:
-            f_print(f'<p>{dataset}</p>\n')
-
             df_dataset = get_dataset_df(df, dataset)
+            if model_to_compare not in df_dataset['model_type'].unique():
+                continue
+
+            f_print(f'<p>{dataset}</p>\n')
             f_print('<table>')
             f_print('<tr>')
             f_print('<td></td>')
@@ -179,22 +178,16 @@ table, th, td {
                 f_print(f'<th>{group_id}</th>')
             f_print('</tr>')
             for row_idx, dis_metric in enumerate(DIS_METRICS):
-                # f_print('<tr>')
-                # f_print(dis_metric)
-                # f_print('</tr>')
-
                 df_metric, metric_col_name = get_metric_df(df_dataset, dis_metric)
                 df_grouped = df_metric.groupby('group_id')[metric_col_name].mean()
-
-                # f_print('<tr>')
-                # for group_id in df_grouped.index:
-                #     f_print(f'<td>{group_id}</td>')
-                # f_print('</tr>')
 
                 f_print('<tr>')
                 f_print(f'<td>{dis_metric.split(".")[-1]}</td>')
                 for result in df_grouped:
-                    f_print(f'<td>{round(result, 4)}</td>')
+                    if result == df_grouped.max():
+                        f_print(f'<td><b>{round(result, 4)}</b></td>')
+                    else:
+                        f_print(f'<td>{round(result, 4)}</td>')
                 f_print('</tr>')
 
             f_print('</table>')
@@ -208,11 +201,16 @@ def main(result_files):
     df_baseline = load_baseline()
     df_results = load_results(result_files)
 
-    df = pd.concat((df_baseline, df_results), sort=True)
-    df = preprocess(df)
+    df_ = pd.concat((df_baseline, df_results), sort=True)
 
-    # plot_violin(df)
-    print_tables(df)
+    for model_to_compare in ('hnlpca', 'greedy'):
+        _OUT_DIR = PLOT_DIR / model_to_compare
+        _OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+        df = preprocess(df_, model_to_compare=model_to_compare)
+
+        plot_violin(df, out_dir=_OUT_DIR)
+        print_tables(df, model_to_compare=model_to_compare, out_dir=_OUT_DIR)
 
 
 if __name__ == '__main__':
