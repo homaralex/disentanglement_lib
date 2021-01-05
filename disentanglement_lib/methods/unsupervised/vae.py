@@ -796,12 +796,14 @@ class HNLPCA(BetaVAE):
     def __init__(
             self,
             balanced,
+            intrinsic,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
         self.balanced = balanced
+        self.intrinsic = intrinsic
 
     def decode(
             self,
@@ -812,7 +814,7 @@ class HNLPCA(BetaVAE):
     ):
         if is_training and params is not None:
             # during training we replicate the batches and mask them appropriately to simulate the bottleneck
-            num_towers = params['dataset_num_factors']
+            num_towers = params['dataset_intrinsic_num_factors' if self.intrinsic else 'dataset_num_factors']
             num_latents = int(latent_tensor.shape[-1])
             masked_latents = []
             for i in range(1, num_towers + 1):

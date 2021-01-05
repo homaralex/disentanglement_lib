@@ -6,12 +6,14 @@ class HNLPCAStudy(BaseSparsityStudy):
     def __init__(
             self,
             balanced=False,
+            intrinsic=False,
             *args,
             **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
         self.balanced = balanced
+        self.intrinsic = intrinsic
 
     def get_seeds(self, num):
         if num != 50:
@@ -23,11 +25,13 @@ class HNLPCAStudy(BaseSparsityStudy):
         model_fn = h.fixed("model.model", "@hlnpca()")
         beta = h.fixed('vae.beta', self.beta)
         balanced = h.fixed('hlnpca.balanced', self.balanced)
+        intrinsic = h.fixed('hlnpca.intrinsic', self.intrinsic)
 
         config_hnlpca = h.zipit([
             model_name,
             beta,
             balanced,
+            intrinsic,
             model_fn,
         ])
 
