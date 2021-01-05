@@ -180,16 +180,19 @@ table, th, td {
             for row_idx, dis_metric in enumerate(DIS_METRICS):
                 df_metric, metric_col_name = get_metric_df(df_dataset, dis_metric)
                 df_grouped = df_metric.groupby('group_id')[metric_col_name].mean()
+                res_sorted = df_grouped.sort_values(ascending=False).index
+                both_better_than_baseline = all('hnlpca' in m_name for m_name in (res_sorted[0], res_sorted[1]))
 
                 f_print('<tr>')
                 f_print(f'<td>{dis_metric.split(".")[-1]}</td>')
-                for result in df_grouped:
+                for result, res_name in zip(df_grouped, df_grouped.index):
                     if result == df_grouped.max():
+                        f_print(f'<td><b>{round(result, 4)}</b></td>')
+                    elif both_better_than_baseline and 'hnlpca' in res_name:
                         f_print(f'<td><b>{round(result, 4)}</b></td>')
                     else:
                         f_print(f'<td>{round(result, 4)}</td>')
                 f_print('</tr>')
-
             f_print('</table>')
         f_print('''
 </body>
