@@ -68,7 +68,8 @@ class SmallNORB(ground_truth_data.GroundTruthData):
 
     @property
     def intrinsic_num_factors(self):
-        return 10
+        # +1 to account for "instance in the category"
+        return self.num_factors + 1
 
     @property
     def factors_num_values(self):
