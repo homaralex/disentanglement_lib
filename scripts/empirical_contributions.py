@@ -38,7 +38,7 @@ def estimate_contributions(
         factor_contribs[factor_idx] /= sampled_factors.shape[0]
         factor_contribs[factor_idx] /= factor_size
 
-    # filter out non-contributing dimensions
+    # filter out non-contributing dimensions (i.e., hack for dsprites_full)
     factor_contribs = factor_contribs[factor_contribs != 0]
 
     if normalize:
@@ -52,13 +52,13 @@ def main(num_sampled_factors):
 
     for dataset_name in (
             'dsprites_full',
-            "color_dsprites",
-            "noisy_dsprites",
-            "scream_dsprites",
-            "smallnorb",
-            "cars3d",
+            'color_dsprites',
+            'noisy_dsprites',
+            'scream_dsprites',
+            'smallnorb',
+            'cars3d',
             # TODO uncomment
-            # "shapes3d",
+            # 'shapes3d',
     ):
         dataset = named_data.get_named_ground_truth_data(dataset_name)
         print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
@@ -84,8 +84,7 @@ def main(num_sampled_factors):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
-    # TODO default value
-    parser.add_argument('--num_sampled_factors', type=int, default=20)
+    parser.add_argument('--num_sampled_factors', type=int, default=100)
     args = parser.parse_args()
 
     main(num_sampled_factors=args.num_sampled_factors)
