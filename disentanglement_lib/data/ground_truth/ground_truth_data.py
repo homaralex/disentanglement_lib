@@ -38,6 +38,10 @@ class GroundTruthData(object):
     def observation_shape(self):
         raise NotImplementedError()
 
+    @property
+    def all_factor_sizes(self):
+        return self.factor_sizes
+
     def sample_factors(self, num, random_state):
         """Sample a batch of factors Y."""
         raise NotImplementedError()
@@ -54,3 +58,6 @@ class GroundTruthData(object):
     def sample_observations(self, num, random_state):
         """Sample a batch of observations X."""
         return self.sample(num, random_state)[1]
+
+    def sample_observations_from_all_factors(self, factors, random_state):
+        return self.sample_observations_from_factors(factors=factors, random_state=random_state)

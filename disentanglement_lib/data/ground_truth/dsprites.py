@@ -128,9 +128,36 @@ class ColorDSprites(DSprites):
             axis=2)
         return observations * color
 
+    def sample_observations_from_all_factors(self, factors, random_state):
+        no_color_factors = factors.copy()
+        no_color_factors[:, 0] = 0
+        no_color_observations = self.sample_observations_from_factors_no_color(no_color_factors, random_state)
+
+        observations = np.repeat(no_color_observations, 3, axis=3)
+        color = np.stack([
+            factors[:, 0] % 10,
+            (factors[:, 0] / 10).astype(int) % 10,
+            (factors[:, 0] / 100).astype(int) % 10,
+        ], axis=1) / 20 + .5
+        color = np.repeat(
+            np.repeat(
+                np.expand_dims(color, axis=(1, 2)),
+                observations.shape[1],
+                axis=1),
+            observations.shape[2],
+            axis=2)
+        return observations * color
+
     @property
     def intrinsic_num_factors(self):
         return self.num_factors + 1
+
+    @property
+    def all_factor_sizes(self):
+        factor_sizes = self.factor_sizes.copy()
+        factor_sizes[0] = 10 ** 3
+
+        return factor_sizes
 
 
 class NoisyDSprites(DSprites):
@@ -202,6 +229,13 @@ class ScreamDSprites(DSprites):
     @property
     def intrinsic_num_factors(self):
         return self.num_factors + 1
+
+    @property
+    def all_factor_sizes(self):
+        factor_sizes = self.factor_sizes.copy()
+        factor_sizes[0] = 100
+
+        return factor_sizes
 
 
 # Object colors generated using

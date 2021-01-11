@@ -12,7 +12,7 @@ def estimate_contributions(
         random_state,
         normalize=True,
 ):
-    factor_contribs = np.zeros((len(dataset.factor_sizes),))
+    factor_contribs = np.zeros((len(dataset.all_factor_sizes),))
     sampled_latents = dataset.state_space.sample_latent_factors(
         num=num_sampled_factors,
         random_state=random_state,
@@ -22,7 +22,7 @@ def estimate_contributions(
         random_state=random_state,
     )
 
-    for factor_idx, factor_size in enumerate(dataset.factor_sizes):
+    for factor_idx, factor_size in enumerate(dataset.all_factor_sizes):
         xs = np.arange(0, factor_size, 1)
 
         for curr_point in sampled_factors:
@@ -30,7 +30,7 @@ def estimate_contributions(
             points = np.repeat(curr_point, factor_size, axis=0)
             points[:, factor_idx] = xs
 
-            ys = dataset.sample_observations_from_factors(factors=points, random_state=random_state)
+            ys = dataset.sample_observations_from_all_factors(factors=points, random_state=random_state)
             diffs = np.diff(ys, axis=0)
 
             factor_contribs[factor_idx] += np.power(diffs, 2).sum()
@@ -84,8 +84,8 @@ def main(num_sampled_factors):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument('--num_sampled_factors', type=int, default=500)
-    parser.add_argument('--intrinsic', action='store_true')
+    # TODO default value
+    parser.add_argument('--num_sampled_factors', type=int, default=20)
     args = parser.parse_args()
 
     main(num_sampled_factors=args.num_sampled_factors)
