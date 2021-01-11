@@ -227,10 +227,7 @@ class ScreamDSprites(DSprites):
         return observations
 
     def sample_observations_from_all_factors(self, factors, random_state):
-        """
-        We treat the scream background as random noise (not a real contribution) but still encode the color (like in
-        color_dsprites).
-        """
+        """We set the scream background constant but still encode the color (like in color_dsprites)."""
         no_color_factors = factors.copy()
         no_color_factors[:, 0] = 0
         no_color_observations = self.sample_observations_from_factors_no_color(no_color_factors, random_state)
@@ -243,8 +240,8 @@ class ScreamDSprites(DSprites):
         ], axis=1) / 10
 
         for i in range(observations.shape[0]):
-            x_crop = random_state.randint(0, self.scream.shape[0] - 64)
-            y_crop = random_state.randint(0, self.scream.shape[1] - 64)
+            x_crop = 1  # random_state.randint(0, self.scream.shape[0] - 64)
+            y_crop = 1  # random_state.randint(0, self.scream.shape[1] - 64)
             background = (self.scream[x_crop:x_crop + 64, y_crop:y_crop + 64] + color[i]) / 2.
             mask = (observations[i] == 1)
             background[mask] = 1 - background[mask]
