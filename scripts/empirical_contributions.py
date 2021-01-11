@@ -1,29 +1,18 @@
+import argparse
+
 import numpy as np
 
 from disentanglement_lib.data.ground_truth import named_data
 from disentanglement_lib.data.ground_truth import util
 
-num_sampled_factors = 200
-random_state = np.random.RandomState(1)
 
-
-def estimate_gradient(dataset):
-    factors = dataset.sample_factors(num=num_sampled_factors, random_state=random_state)
-    batch = dataset.sample_observations_from_factors(factors=factors, random_state=random_state)
-
-    batch_squeezed = np.reshape(batch, (batch.shape[0], -1))
-
-    for dim_idx in range(batch_squeezed.shape[1]):
-        f = batch_squeezed[:, dim_idx]
-        f = np.expand_dims(f, 1)
-        grad = np.gradient(
-            f,
-            factors,
-        )
-        print(grad)
-
-
-def estimate_contributions(dataset):
+def estimate_contributions(
+        dataset,
+        num_sampled_factors,
+        random_state,
+        normalize=True,
+):
+    # TODO sample from ALL factors (including intrinsic)
     sampled_factors = dataset.state_space.sample_latent_factors(num=num_sampled_factors, random_state=random_state)
     factor_contribs = np.zeros((len(dataset.latent_factor_indices),))
 
@@ -43,26 +32,43 @@ def estimate_contributions(dataset):
         factor_contribs[factor_idx] /= sampled_factors.shape[0]
         factor_contribs[factor_idx] /= factor_size
 
+    if normalize:
+        factor_contribs = factor_contribs / np.linalg.norm(factor_contribs, 2)
+
     return factor_contribs
 
 
-for dataset_name in (
-        'dsprites_full',
-        "color_dsprites",
-        "noisy_dsprites",
-        "scream_dsprites",
-        "smallnorb",
-        "cars3d",
-        # TODO uncomment
-        # "shapes3d",
-):
-    dataset = named_data.get_named_ground_truth_data(dataset_name)
-    print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
+def main(num_sampled_factors):
+    random_state = np.random.RandomState(1)
 
-    assert type(dataset.state_space) == util.SplitDiscreteStateSpace
+    for dataset_name in (
+            'dsprites_full',
+            "color_dsprites",
+            "noisy_dsprites",
+            "scream_dsprites",
+            "smallnorb",
+            "cars3d",
+            # TODO uncomment
+            # "shapes3d",
+    ):
+        dataset = named_data.get_named_ground_truth_data(dataset_name)
+        print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
 
-    estimated_contribs = estimate_contributions(dataset)
-    # print(estimated_contribs.round())
-    normalized_contribs = estimated_contribs / np.linalg.norm(estimated_contribs, 2)
-    print(normalized_contribs.round(2))
-    print(normalized_contribs.std().round(3))
+        assert type(dataset.state_space) == util.SplitDiscreteStateSpace
+
+        estimated_contribs = estimate_contributions(
+            dataset=dataset,
+            num_sampled_factors=num_sampled_factors,
+            random_state=random_state,
+        )
+
+        print(estimated_contribs.round(2))
+        print(estimated_contribs.std().round(3))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument('num_sampled_factors', type=int, default=200)
+    args = parser.parse_args()
+
+    main(num_sampled_factors=args.num_sampled_factors)
