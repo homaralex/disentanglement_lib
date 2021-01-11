@@ -12,11 +12,17 @@ def estimate_contributions(
         random_state,
         normalize=True,
 ):
-    # TODO sample from ALL factors (including intrinsic)
-    sampled_factors = dataset.state_space.sample_latent_factors(num=num_sampled_factors, random_state=random_state)
-    factor_contribs = np.zeros((len(dataset.latent_factor_indices),))
+    factor_contribs = np.zeros((len(dataset.factor_sizes),))
+    sampled_latents = dataset.state_space.sample_latent_factors(
+        num=num_sampled_factors,
+        random_state=random_state,
+    )
+    sampled_factors = dataset.state_space.sample_all_factors(
+        latent_factors=sampled_latents,
+        random_state=random_state,
+    )
 
-    for factor_idx, factor_size in enumerate(np.array(dataset.factor_sizes)[dataset.latent_factor_indices]):
+    for factor_idx, factor_size in enumerate(dataset.factor_sizes):
         xs = np.arange(0, factor_size, 1)
 
         for curr_point in sampled_factors:
@@ -31,6 +37,9 @@ def estimate_contributions(
 
         factor_contribs[factor_idx] /= sampled_factors.shape[0]
         factor_contribs[factor_idx] /= factor_size
+
+    # filter out non-contributing dimensions
+    factor_contribs = factor_contribs[factor_contribs != 0]
 
     if normalize:
         factor_contribs = factor_contribs / np.linalg.norm(factor_contribs, 2)
@@ -62,13 +71,21 @@ def main(num_sampled_factors):
             random_state=random_state,
         )
 
-        print(estimated_contribs.round(2))
-        print(estimated_contribs.std().round(3))
+        # TODO save to file
+        std_all = estimated_contribs.std()
+        std = std_all
+        if dataset.intrinsic_num_factors != dataset.num_factors:
+            std = estimated_contribs[dataset.latent_factor_indices].std()
+
+        print(estimated_contribs.round(3))
+        print(std_all.round(3))
+        print(std.round(3))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument('num_sampled_factors', type=int, default=200)
+    parser.add_argument('--num_sampled_factors', type=int, default=500)
+    parser.add_argument('--intrinsic', action='store_true')
     args = parser.parse_args()
 
     main(num_sampled_factors=args.num_sampled_factors)
