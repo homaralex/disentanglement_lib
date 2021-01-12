@@ -61,3 +61,9 @@ class GroundTruthData(object):
 
     def sample_observations_from_all_factors(self, factors, random_state):
         return self.sample_observations_from_factors(factors=factors, random_state=random_state)
+
+    def sample_all_factors(self, latent_factors, random_state):
+        return self.state_space.sample_all_factors(
+            latent_factors=latent_factors,
+            random_state=random_state,
+        )

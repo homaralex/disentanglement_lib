@@ -2,6 +2,7 @@ import csv
 import argparse
 from pathlib import Path
 
+import gin
 import numpy as np
 
 from disentanglement_lib.data.ground_truth import named_data
@@ -9,6 +10,7 @@ from disentanglement_lib.data.ground_truth import util
 
 PLOT_DIR = Path('plots')
 PLOT_DIR.mkdir(exist_ok=True)
+
 
 def estimate_contributions(
         dataset,
@@ -21,7 +23,7 @@ def estimate_contributions(
         num=num_sampled_factors,
         random_state=random_state,
     )
-    sampled_factors = dataset.state_space.sample_all_factors(
+    sampled_factors = dataset.sample_all_factors(
         latent_factors=sampled_latents,
         random_state=random_state,
     )
@@ -51,8 +53,13 @@ def estimate_contributions(
     return factor_contribs
 
 
-def main(out_file, num_sampled_factors):
+def main(
+        out_file,
+        num_sampled_factors,
+        full_color_dims,
+):
     random_state = np.random.RandomState(1)
+    gin.bind_parameter('AbstractColorDSprites.color_as_single_dim', not full_color_dims)
 
     out_file = PLOT_DIR / out_file
     with out_file.open(mode='w') as csv_file:
@@ -73,8 +80,7 @@ def main(out_file, num_sampled_factors):
                 'scream_dsprites',
                 'smallnorb',
                 'cars3d',
-                # TODO uncomment
-                # 'shapes3d',
+                'shapes3d',
         ):
             dataset = named_data.get_named_ground_truth_data(dataset_name)
             print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
@@ -88,16 +94,17 @@ def main(out_file, num_sampled_factors):
             )
 
             std_all = estimated_contribs.std()
-            std = std_all
+            std, estimated_contribs_ = std_all, estimated_contribs
             if dataset.intrinsic_num_factors != dataset.num_factors:
                 std = estimated_contribs[dataset.latent_factor_indices].std()
+                estimated_contribs_ = estimated_contribs[dataset.latent_factor_indices]
 
             csv_writer.writerow([
                 dataset_name,
                 std_all,
                 std,
                 estimated_contribs,
-                estimated_contribs[dataset.latent_factor_indices],
+                estimated_contribs_,
             ])
 
             print(estimated_contribs.round(3))
@@ -107,12 +114,13 @@ def main(out_file, num_sampled_factors):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
-    # TODO change default value
-    parser.add_argument('--num_sampled_factors', type=int, default=20)
+    parser.add_argument('--num_sampled_factors', type=int, default=100)
+    parser.add_argument('--full_color_dims', action='store_true')
     parser.add_argument('--out_file', type=str, default='contribs.csv')
     args = parser.parse_args()
 
     main(
         out_file=args.out_file,
         num_sampled_factors=args.num_sampled_factors,
+        full_color_dims=args.full_color_dims,
     )

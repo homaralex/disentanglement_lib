@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
+
+import gin
+
 from disentanglement_lib.data.ground_truth import ground_truth_data
 from disentanglement_lib.data.ground_truth import util
 import numpy as np
@@ -64,8 +67,7 @@ class DSprites(ground_truth_data.GroundTruthData):
         self.full_factor_sizes = [1, 3, 6, 40, 32, 32]
         self.factor_bases = np.prod(self.factor_sizes) / np.cumprod(
             self.factor_sizes)
-        self.state_space = util.SplitDiscreteStateSpace(self.factor_sizes,
-                                                        self.latent_factor_indices)
+        self.state_space = util.SplitDiscreteStateSpace(self.factor_sizes, self.latent_factor_indices)
 
     @property
     def num_factors(self):
@@ -96,7 +98,75 @@ class DSprites(ground_truth_data.GroundTruthData):
         return random_state.randint(self.factor_sizes[i], size=num)
 
 
-class ColorDSprites(DSprites):
+@gin.configurable
+class AbstractColorDSprites(DSprites):
+    def __init__(
+            self,
+            color_as_single_dim=True,
+            *args,
+            **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.color_as_single_dim = color_as_single_dim
+        self._num_color_values = 10
+
+    @property
+    def intrinsic_num_factors(self):
+        return self.num_factors + (1 if self.color_as_single_dim else 3)
+
+    @property
+    def all_factor_sizes(self):
+        factor_sizes = self.factor_sizes.copy()
+
+        if self.color_as_single_dim:
+            factor_sizes[0] = self._num_color_values ** 3
+        else:
+            factor_sizes[0] = self._num_color_values
+            factor_sizes = np.array(list(factor_sizes) + [self._num_color_values, self._num_color_values])
+
+        return factor_sizes
+
+    def sample_all_factors(self, latent_factors, random_state):
+        factors = super().sample_all_factors(
+            latent_factors=latent_factors,
+            random_state=random_state,
+        )
+
+        if self.color_as_single_dim:
+            factors[:, 0] = random_state.randint(0, self.all_factor_sizes[0], size=(factors.shape[0],))
+        else:
+            color = random_state.randint(0, self._num_color_values, size=(factors.shape[0], 3))
+            factors[:, 0] = color[:, 0]
+            factors = np.concatenate((factors, color[:, 1:]), axis=1)
+
+        return factors
+
+    def _get_colors_and_no_color_observations(self, factors, random_state):
+        no_color_factors = factors.copy()
+        no_color_factors[:, 0] = 0
+        if not self.color_as_single_dim:
+            no_color_factors = no_color_factors[:, :-2]
+        no_color_observations = self.sample_observations_from_factors_no_color(no_color_factors, random_state)
+        observations = np.repeat(no_color_observations, 3, axis=3)
+
+        if self.color_as_single_dim:
+            color = np.stack([
+                factors[:, 0] % self._num_color_values,
+                (factors[:, 0] / self._num_color_values).astype(int) % self._num_color_values,
+                (factors[:, 0] / self._num_color_values ** 2).astype(int) % self._num_color_values,
+            ], axis=1)
+        else:
+            color = np.stack([
+                factors[:, 0],
+                factors[:, -2],
+                factors[:, -1],
+            ], axis=1)
+
+        return color, observations
+
+
+class ColorDSprites(AbstractColorDSprites):
     """Color DSprites.
 
     This data set is the same as the original DSprites data set except that when
@@ -111,8 +181,8 @@ class ColorDSprites(DSprites):
     4 - position y (32 different values)
     """
 
-    def __init__(self, latent_factor_indices=None):
-        DSprites.__init__(self, latent_factor_indices)
+    def __init__(self, latent_factor_indices=None, *args, **kwargs):
+        super().__init__(latent_factor_indices=latent_factor_indices, *args, **kwargs)
         self.data_shape = [64, 64, 3]
 
     def sample_observations_from_factors(self, factors, random_state):
@@ -129,35 +199,15 @@ class ColorDSprites(DSprites):
         return observations * color
 
     def sample_observations_from_all_factors(self, factors, random_state):
-        no_color_factors = factors.copy()
-        no_color_factors[:, 0] = 0
-        no_color_observations = self.sample_observations_from_factors_no_color(no_color_factors, random_state)
-
-        observations = np.repeat(no_color_observations, 3, axis=3)
-        color = np.stack([
-            factors[:, 0] % 10,
-            (factors[:, 0] / 10).astype(int) % 10,
-            (factors[:, 0] / 100).astype(int) % 10,
-        ], axis=1) / 20 + .5
+        color, observations = self._get_colors_and_no_color_observations(factors=factors, random_state=random_state)
         color = np.repeat(
             np.repeat(
                 np.expand_dims(color, axis=(1, 2)),
                 observations.shape[1],
                 axis=1),
             observations.shape[2],
-            axis=2)
+            axis=2) / 20 + .5
         return observations * color
-
-    @property
-    def intrinsic_num_factors(self):
-        return self.num_factors + 1
-
-    @property
-    def all_factor_sizes(self):
-        factor_sizes = self.factor_sizes.copy()
-        factor_sizes[0] = 10 ** 3
-
-        return factor_sizes
 
 
 class NoisyDSprites(DSprites):
@@ -187,7 +237,7 @@ class NoisyDSprites(DSprites):
         return np.minimum(observations + color, 1.)
 
 
-class ScreamDSprites(DSprites):
+class ScreamDSprites(AbstractColorDSprites):
     """Scream DSprites.
 
     This data set is the same as the original DSprites data set except that when
@@ -204,7 +254,7 @@ class ScreamDSprites(DSprites):
     """
 
     def __init__(self, latent_factor_indices=None):
-        DSprites.__init__(self, latent_factor_indices)
+        super().__init__(latent_factor_indices=latent_factor_indices)
         self.data_shape = [64, 64, 3]
         with gfile.Open(SCREAM_PATH, "rb") as f:
             scream = PIL.Image.open(f)
@@ -228,16 +278,9 @@ class ScreamDSprites(DSprites):
 
     def sample_observations_from_all_factors(self, factors, random_state):
         """We set the scream background constant but still encode the color (like in color_dsprites)."""
-        no_color_factors = factors.copy()
-        no_color_factors[:, 0] = 0
-        no_color_observations = self.sample_observations_from_factors_no_color(no_color_factors, random_state)
-        observations = np.repeat(no_color_observations, 3, axis=3)
+        color, observations = self._get_colors_and_no_color_observations(factors=factors, random_state=random_state)
 
-        color = np.stack([
-            factors[:, 0] % 10,
-            (factors[:, 0] / 10).astype(int) % 10,
-            (factors[:, 0] / 100).astype(int) % 10,
-        ], axis=1) / 10
+        color = color / 10
 
         for i in range(observations.shape[0]):
             x_crop = 1  # random_state.randint(0, self.scream.shape[0] - 64)
@@ -247,17 +290,6 @@ class ScreamDSprites(DSprites):
             background[mask] = 1 - background[mask]
             observations[i] = background
         return observations
-
-    @property
-    def intrinsic_num_factors(self):
-        return self.num_factors + 1
-
-    @property
-    def all_factor_sizes(self):
-        factor_sizes = self.factor_sizes.copy()
-        factor_sizes[0] = 10 ** 3
-
-        return factor_sizes
 
 
 # Object colors generated using
