@@ -1,10 +1,14 @@
+import csv
 import argparse
+from pathlib import Path
 
 import numpy as np
 
 from disentanglement_lib.data.ground_truth import named_data
 from disentanglement_lib.data.ground_truth import util
 
+PLOT_DIR = Path('plots')
+PLOT_DIR.mkdir(exist_ok=True)
 
 def estimate_contributions(
         dataset,
@@ -47,44 +51,68 @@ def estimate_contributions(
     return factor_contribs
 
 
-def main(num_sampled_factors):
+def main(out_file, num_sampled_factors):
     random_state = np.random.RandomState(1)
 
-    for dataset_name in (
-            'dsprites_full',
-            'color_dsprites',
-            'noisy_dsprites',
-            'scream_dsprites',
-            'smallnorb',
-            'cars3d',
-            # TODO uncomment
-            # 'shapes3d',
-    ):
-        dataset = named_data.get_named_ground_truth_data(dataset_name)
-        print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
+    out_file = PLOT_DIR / out_file
+    with out_file.open(mode='w') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        # write header
+        csv_writer.writerow([
+            'dataset',
+            'all_std',
+            'std',
+            'all_contribs',
+            'contribs',
+        ])
 
-        assert type(dataset.state_space) == util.SplitDiscreteStateSpace
+        for dataset_name in (
+                'dsprites_full',
+                'color_dsprites',
+                'noisy_dsprites',
+                'scream_dsprites',
+                'smallnorb',
+                'cars3d',
+                # TODO uncomment
+                # 'shapes3d',
+        ):
+            dataset = named_data.get_named_ground_truth_data(dataset_name)
+            print(dataset.num_factors, dataset.intrinsic_num_factors, dataset_name)
 
-        estimated_contribs = estimate_contributions(
-            dataset=dataset,
-            num_sampled_factors=num_sampled_factors,
-            random_state=random_state,
-        )
+            assert type(dataset.state_space) == util.SplitDiscreteStateSpace
 
-        # TODO save to file
-        std_all = estimated_contribs.std()
-        std = std_all
-        if dataset.intrinsic_num_factors != dataset.num_factors:
-            std = estimated_contribs[dataset.latent_factor_indices].std()
+            estimated_contribs = estimate_contributions(
+                dataset=dataset,
+                num_sampled_factors=num_sampled_factors,
+                random_state=random_state,
+            )
 
-        print(estimated_contribs.round(3))
-        print(std_all.round(3))
-        print(std.round(3))
+            std_all = estimated_contribs.std()
+            std = std_all
+            if dataset.intrinsic_num_factors != dataset.num_factors:
+                std = estimated_contribs[dataset.latent_factor_indices].std()
+
+            csv_writer.writerow([
+                dataset_name,
+                std_all,
+                std,
+                estimated_contribs,
+                estimated_contribs[dataset.latent_factor_indices],
+            ])
+
+            print(estimated_contribs.round(3))
+            print(std_all.round(3))
+            print(std.round(3))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument('--num_sampled_factors', type=int, default=100)
+    # TODO change default value
+    parser.add_argument('--num_sampled_factors', type=int, default=20)
+    parser.add_argument('--out_file', type=str, default='contribs.csv')
     args = parser.parse_args()
 
-    main(num_sampled_factors=args.num_sampled_factors)
+    main(
+        out_file=args.out_file,
+        num_sampled_factors=args.num_sampled_factors,
+    )
