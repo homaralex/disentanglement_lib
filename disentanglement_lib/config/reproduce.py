@@ -194,9 +194,10 @@ _greedy_studies = {
 
 _balanced_weighing = h.sweep('balanced', (True, False))
 _intrinsic = h.sweep('intrinsic', (True, False))
-_sweep_hnlpca = h.product((_betas, _datasets, _balanced_weighing, _intrinsic))
+_full_color_dims = h.sweep('full_color_dims', (True, False))
+_sweep_hnlpca = h.product((_betas, _datasets, _balanced_weighing, _intrinsic, _full_color_dims))
 _hnlpca_studies = {
-    f"{s['dataset']}_hnlpca{'_balanced' if s['balanced'] else ''}{'_intrinsic' if s['intrinsic'] else ''}_b_{s['beta']}": greedy_study.HNLPCAStudy(
+    f"{s['dataset']}_hnlpca{'_balanced' if s['balanced'] else ''}{'_intrinsic' if s['intrinsic'] else ''}{'_full' if s['full_color_dims'] else ''}_b_{s['beta']}": greedy_study.HNLPCAStudy(
         **s)
     for s in _sweep_hnlpca
 }

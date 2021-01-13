@@ -7,6 +7,8 @@ class HNLPCAStudy(BaseSparsityStudy):
             self,
             balanced=False,
             intrinsic=False,
+            # for colored versions of DSprites - indicates whether to use 3 dimensions to encode color
+            full_color_dims=False,
             *args,
             **kwargs,
     ):
@@ -14,6 +16,7 @@ class HNLPCAStudy(BaseSparsityStudy):
 
         self.balanced = balanced
         self.intrinsic = intrinsic
+        self.full_color_dims = full_color_dims
 
     def get_seeds(self, num):
         if num != 50:
@@ -26,12 +29,14 @@ class HNLPCAStudy(BaseSparsityStudy):
         beta = h.fixed('vae.beta', self.beta)
         balanced = h.fixed('hlnpca.balanced', self.balanced)
         intrinsic = h.fixed('hlnpca.intrinsic', self.intrinsic)
+        full_color_dims = h.fixed('AbstractColorDSprites.color_as_single_dim', not self.full_color_dims)
 
         config_hnlpca = h.zipit([
             model_name,
             beta,
             balanced,
             intrinsic,
+            full_color_dims,
             model_fn,
         ])
 
