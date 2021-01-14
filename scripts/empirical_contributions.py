@@ -18,39 +18,47 @@ def estimate_contributions(
         random_state,
         normalize=True,
 ):
-    factor_contribs = np.zeros((len(dataset.all_factor_sizes),))
+    factor_diffs = np.zeros((len(dataset.all_factor_sizes),))
+    factor_variances = np.zeros((len(dataset.all_factor_sizes),))
+
     sampled_latents = dataset.state_space.sample_latent_factors(
         num=num_sampled_factors,
         random_state=random_state,
     )
-    sampled_factors = dataset.sample_all_factors(
+    sampled_points = dataset.sample_all_factors(
         latent_factors=sampled_latents,
         random_state=random_state,
     )
 
     for factor_idx, factor_size in enumerate(dataset.all_factor_sizes):
         xs = np.arange(0, factor_size, 1)
+        if factor_size < 2:
+            continue
 
-        for curr_point in sampled_factors:
+        for curr_point in sampled_points:
             curr_point = np.expand_dims(curr_point.copy(), axis=0)
             points = np.repeat(curr_point, factor_size, axis=0)
             points[:, factor_idx] = xs
 
             ys = dataset.sample_observations_from_all_factors(factors=points, random_state=random_state)
             diffs = np.diff(ys, axis=0)
+            variances = ys.var(axis=0)
 
-            factor_contribs[factor_idx] += np.power(diffs, 2).sum()
+            factor_diffs[factor_idx] += np.power(diffs, 2).mean()
+            factor_variances[factor_idx] += variances.mean()
 
-        factor_contribs[factor_idx] /= sampled_factors.shape[0]
-        factor_contribs[factor_idx] /= factor_size
+        factor_diffs[factor_idx] /= sampled_points.shape[0]
+        factor_variances[factor_idx] /= sampled_points.shape[0]
 
     # filter out non-contributing dimensions (i.e., hack for dsprites_full)
-    factor_contribs = factor_contribs[factor_contribs != 0]
+    factor_diffs = factor_diffs[factor_diffs != 0]
+    factor_variances = factor_variances[factor_variances != 0]
 
     if normalize:
-        factor_contribs = factor_contribs / np.linalg.norm(factor_contribs, 2)
+        factor_diffs = factor_diffs / np.linalg.norm(factor_diffs, 2)
+        factor_variances = factor_variances / np.linalg.norm(factor_variances, 2)
 
-    return factor_contribs
+    return factor_diffs, factor_variances
 
 
 def main(
@@ -67,10 +75,10 @@ def main(
         # write header
         csv_writer.writerow([
             'dataset',
-            'all_std',
-            'std',
-            'all_contribs',
-            'contribs',
+            'diffs',
+            'diffs_all',
+            'variances',
+            'variances_all',
         ])
 
         for dataset_name in (
@@ -87,29 +95,29 @@ def main(
 
             assert type(dataset.state_space) == util.SplitDiscreteStateSpace
 
-            estimated_contribs = estimate_contributions(
+            estimated_diffs, estimated_variances = estimate_contributions(
                 dataset=dataset,
                 num_sampled_factors=num_sampled_factors,
                 random_state=random_state,
             )
 
-            std_all = estimated_contribs.std()
-            std, estimated_contribs_ = std_all, estimated_contribs
+            estimated_diffs_all, estimated_variances_all = estimated_diffs, estimated_variances
             if dataset.intrinsic_num_factors != dataset.num_factors:
-                std = estimated_contribs[dataset.latent_factor_indices].std()
-                estimated_contribs_ = estimated_contribs[dataset.latent_factor_indices]
+                estimated_diffs_all = estimated_diffs[dataset.latent_factor_indices]
+                estimated_variances_all = estimated_variances[dataset.latent_factor_indices]
 
             csv_writer.writerow([
                 dataset_name,
-                std_all,
-                std,
-                estimated_contribs,
-                estimated_contribs_,
+                estimated_diffs,
+                estimated_diffs_all,
+                estimated_variances,
+                estimated_variances_all,
             ])
 
-            print(estimated_contribs.round(3))
-            print(std_all.round(3))
-            print(std.round(3))
+            print(estimated_diffs.std().round(3), estimated_diffs.round(3))
+            print(estimated_diffs_all.std().round(3), estimated_diffs_all.round(3))
+            print(estimated_variances.std().round(3), estimated_variances.round(3))
+            print(estimated_variances_all.std().round(3), estimated_variances_all.round(3))
 
 
 if __name__ == '__main__':
