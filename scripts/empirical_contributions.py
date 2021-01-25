@@ -103,8 +103,8 @@ def main(
 
             estimated_diffs_all, estimated_variances_all = estimated_diffs, estimated_variances
             if dataset.intrinsic_num_factors != dataset.num_factors:
-                estimated_diffs_all = estimated_diffs[dataset.latent_factor_indices]
-                estimated_variances_all = estimated_variances[dataset.latent_factor_indices]
+                estimated_diffs = estimated_diffs[dataset.latent_factor_indices]
+                estimated_variances = estimated_variances[dataset.latent_factor_indices]
 
             csv_writer.writerow([
                 dataset_name,
