@@ -1,12 +1,12 @@
+import json
 import argparse
-import os
 from collections import defaultdict
+from pathlib import Path
 
-import numpy as np
 import gin.tf
-import tensorflow as tf
+import numpy as np
+import pandas as pd
 import tensorflow_hub as hub
-from tensorflow import gfile
 
 from disentanglement_lib.data.ground_truth import named_data
 from disentanglement_lib.utils import results
@@ -14,32 +14,25 @@ from disentanglement_lib.utils import results
 
 def main(
         model_dir,
-        # output_dir,
+        output_file,
         num_points,
-        overwrite=True,
 ):
+    model_dir = Path(model_dir)
     # Fix the random seed for reproducibility.
     random_state = np.random.RandomState(0)
-
-    # # Create the output directory if necessary.
-    # if tf.gfile.IsDirectory(output_dir):
-    #     if overwrite:
-    #         tf.gfile.DeleteRecursively(output_dir)
-    #     else:
-    #         raise ValueError("Directory already exists and overwrite is False.")
 
     # Automatically set the proper data set if necessary. We replace the active
     # gin config as this will lead to a valid gin config file where the data set
     # is present.
     # Obtain the dataset name from the gin config of the previous step.
-    gin_config_file = os.path.join(model_dir, 'results', 'gin', 'train.gin')
-    gin_dict = results.gin_dict(gin_config_file)
+    gin_config_file = model_dir / 'model' / 'results' / 'gin' / 'train.gin'
+    gin_dict = results.gin_dict(str(gin_config_file))
     gin.bind_parameter('dataset.name', gin_dict['dataset.name'].replace("'", ""))
 
     dataset = named_data.get_named_ground_truth_data()
-    module_path = os.path.join(model_dir, 'tfhub')
+    module_path = model_dir / 'model' / 'tfhub'
 
-    with hub.eval_function_for_module(module_path) as f:
+    with hub.eval_function_for_module(str(module_path)) as f:
         sampled_latents = dataset.state_space.sample_latent_factors(
             num=num_points,
             random_state=random_state,
@@ -57,8 +50,11 @@ def main(
         means = encodings['mean']
         logvars = encodings['logvar']
 
-        print(means.std(axis=0).round(3))
-        print(np.exp(logvars).mean(axis=0).round(3))
+        means_std = means.std(axis=0)
+        avg_variances = np.exp(logvars).mean(axis=0)
+
+        print(means_std.round(3))
+        print(avg_variances.round(3))
 
         # investigate factor-encoding relations
         per_factor_encodings = defaultdict(list)
@@ -84,6 +80,29 @@ def main(
         for factor_idx, factor_std in enumerate(per_factor_stds):
             print(factor_idx, factor_std.round(3))
 
+    results_path = model_dir / 'postprocessed' / 'mean' / 'results' / 'aggregate' / 'train.json'
+    json_results = json.load(results_path.open())
+    uuid = json_results['train_results.uuid']
+
+    results_row = {
+        'uuid': uuid,
+        'per_factor_stds': per_factor_stds,
+        'avg_means': means_std,
+        'variances': avg_variances,
+    }
+    print(results_row)
+
+    output_file = Path(output_file)
+    curr_row = pd.DataFrame([results_row])
+    if output_file.exists():
+        df = pd.read_pickle(output_file)
+        df = pd.concat((df, curr_row))
+    else:
+        df = curr_row
+    df.to_pickle(output_file)
+
+    print(df)
+
 
 def batched_encoder(
         model_fn,
@@ -107,12 +126,12 @@ def batched_encoder(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_dir', type=str)
-    parser.add_argument('--output_dir', type=str)
+    parser.add_argument('--output_file', type=str, default='investigate_reprs.pkl')
     parser.add_argument('--num_points', type=int, default=64)
     args = parser.parse_args()
 
     main(
         model_dir=args.model_dir,
-        # output_dir=args.output_dir,
+        output_file=args.output_file,
         num_points=args.num_points,
     )
