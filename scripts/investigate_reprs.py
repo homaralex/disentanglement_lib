@@ -16,6 +16,7 @@ def main(
         model_dir,
         output_file,
         num_points,
+        overwrite=False,
 ):
     model_dir = Path(model_dir)
     netstore_prefix = Path('../netstore') / 'sparse_dlib' / 'sparse_results'
@@ -35,6 +36,16 @@ def main(
 
     gin_dict = results.gin_dict(str(gin_config_file))
     gin.bind_parameter('dataset.name', gin_dict['dataset.name'].replace("'", ""))
+
+    results_path = model_dir / 'postprocessed' / 'mean' / 'results' / 'aggregate' / 'train.json'
+    json_results = json.load(results_path.open())
+    uuid = json_results['train_results.uuid']
+
+    output_file = Path(output_file)
+    if output_file.exists():
+        df = pd.read_pickle(output_file)
+        if not overwrite and uuid in df['uuid'].unique():
+            print(f'Row wit UUID {uuid} exists - skipping')
 
     dataset = named_data.get_named_ground_truth_data()
 
@@ -86,10 +97,6 @@ def main(
         for factor_idx, factor_std in enumerate(per_factor_stds):
             print(factor_idx, factor_std.round(3))
 
-    results_path = model_dir / 'postprocessed' / 'mean' / 'results' / 'aggregate' / 'train.json'
-    json_results = json.load(results_path.open())
-    uuid = json_results['train_results.uuid']
-
     results_row = {
         'uuid': uuid,
         'per_factor_stds': per_factor_stds,
@@ -98,10 +105,10 @@ def main(
     }
     print(results_row)
 
-    output_file = Path(output_file)
     curr_row = pd.DataFrame([results_row])
     if output_file.exists():
-        df = pd.read_pickle(output_file)
+        if overwrite:
+            df = df.loc[df['uuid'] != uuid]
         df = pd.concat((df, curr_row))
     else:
         df = curr_row
@@ -134,10 +141,12 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', type=str)
     parser.add_argument('--output_file', type=str, default='investigate_reprs.pkl')
     parser.add_argument('--num_points', type=int, default=64)
+    parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
 
     main(
         model_dir=args.model_dir,
         output_file=args.output_file,
         num_points=args.num_points,
+        overwrite=args.overwrite,
     )
