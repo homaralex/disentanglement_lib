@@ -34,6 +34,10 @@ def main(
         gin_config_file = netstore_prefix / gin_config_file
         module_path = netstore_prefix / module_path
 
+    if not gin_config_file.exists():
+        print(f'{gin_config_file} does not exist - exiting')
+        return
+
     gin_dict = results.gin_dict(str(gin_config_file))
     gin.bind_parameter('dataset.name', gin_dict['dataset.name'].replace("'", ""))
 
@@ -46,6 +50,7 @@ def main(
         df = pd.read_pickle(output_file)
         if not overwrite and uuid in df['uuid'].unique():
             print(f'Row wit UUID {uuid} exists - skipping')
+            return
 
     dataset = named_data.get_named_ground_truth_data()
 
