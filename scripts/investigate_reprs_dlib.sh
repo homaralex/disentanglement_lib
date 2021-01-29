@@ -2,7 +2,7 @@ OUT_DIR=output_investigate
 mkdir -p ${OUT_DIR}
 
 for model_num in {0..10799}; do
-  if [[ $(python scripts/config_checker.py --model_num=0 --model_name=beta) -eq 0 ]]
+  if [[ $(python scripts/config_checker.py --model_num=${model_num} --model_name=beta) -eq 0 ]]
   then
     continue
   fi
