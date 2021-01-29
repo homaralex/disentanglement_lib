@@ -13,7 +13,7 @@ for model_num in {1..2}; do
   model_dir=${OUT_DIR}/${model_num}
   python scripts/investigate_reprs.py \
   --model_dir=${model_dir} \
-  --num_points=100 \
+  --num_points=1000 \
   --overwrite \
   --output_file=${OUT_DIR}/dlib_reprs.pkl;
 
