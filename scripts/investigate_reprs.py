@@ -18,6 +18,7 @@ def main(
         num_points,
 ):
     model_dir = Path(model_dir)
+    netstore_prefix = Path('../netstore') / 'sparse_dlib' / 'sparse_results'
     # Fix the random seed for reproducibility.
     random_state = np.random.RandomState(0)
 
@@ -26,11 +27,16 @@ def main(
     # is present.
     # Obtain the dataset name from the gin config of the previous step.
     gin_config_file = model_dir / 'model' / 'results' / 'gin' / 'train.gin'
+    module_path = model_dir / 'model' / 'tfhub'
+
+    if not gin_config_file.exists():
+        gin_config_file = netstore_prefix / gin_config_file
+        module_path = netstore_prefix / module_path
+
     gin_dict = results.gin_dict(str(gin_config_file))
     gin.bind_parameter('dataset.name', gin_dict['dataset.name'].replace("'", ""))
 
     dataset = named_data.get_named_ground_truth_data()
-    module_path = model_dir / 'model' / 'tfhub'
 
     with hub.eval_function_for_module(str(module_path)) as f:
         sampled_latents = dataset.state_space.sample_latent_factors(
@@ -101,7 +107,7 @@ def main(
         df = curr_row
     df.to_pickle(output_file)
 
-    print(df)
+    print(df.head())
 
 
 def batched_encoder(
